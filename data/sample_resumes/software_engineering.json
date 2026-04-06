@@ -1,0 +1,77 @@
+{
+  "personal_info": {
+    "name": "Alex Rivera",
+    "email": "alex.rivera@email.com",
+    "phone": "(415) 555-0182",
+    "location": "San Francisco, CA",
+    "linkedin": "linkedin.com/in/alexrivera",
+    "github": "github.com/alexrivera"
+  },
+  "professional_summary": "Full-stack software engineer with 6 years of experience building scalable backend services and responsive web applications. Expertise in Python, Django, and React with a track record of reducing system latency and improving deployment reliability through CI/CD automation and cloud-native architectures on AWS.",
+  "work_experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Cloudpath Technologies",
+      "location": "San Francisco, CA",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Built and maintained REST APIs serving 2M+ daily requests using Python, Django, and PostgreSQL",
+        "Reduced API response time by 38% by introducing Redis caching and query optimization",
+        "Led migration of monolithic application to microservices architecture on AWS ECS, cutting deployment time by 55%",
+        "Implemented CI/CD pipeline with GitHub Actions and Docker, enabling 4x faster release cycles",
+        "Mentored 3 junior engineers through code reviews and weekly 1:1 technical guidance sessions"
+      ]
+    },
+    {
+      "title": "Software Engineer",
+      "company": "Nexlayer Inc.",
+      "location": "San Jose, CA",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Developed React front-end for SaaS dashboard serving 10,000+ active users",
+        "Designed and built PostgreSQL database schema reducing query complexity by 40%",
+        "Integrated third-party payment APIs (Stripe, Braintree) processing $2M+ in monthly transactions",
+        "Containerized 8 services with Docker and Kubernetes, improving staging environment parity"
+      ]
+    },
+    {
+      "title": "Junior Software Developer",
+      "company": "Brightpath Solutions",
+      "location": "Oakland, CA",
+      "dates": "2018 – 2020",
+      "bullets": [
+        "Built internal tooling dashboards using Flask and Vue.js for the operations team",
+        "Automated nightly data pipeline using Python scripts, saving 12 hours per week of manual work",
+        "Wrote unit and integration tests achieving 85% code coverage across 3 core services",
+        "Participated in on-call rotation, resolving 95% of production incidents within SLA"
+      ]
+    }
+  ],
+  "skills": [
+    "Python", "Django", "React", "PostgreSQL", "AWS", "Docker",
+    "Kubernetes", "REST APIs", "Git", "CI/CD", "Redis", "Microservices",
+    "Flask", "TypeScript", "GitHub Actions", "Linux"
+  ],
+  "education": [
+    {
+      "degree": "B.S. Computer Science",
+      "institution": "University of California, Berkeley",
+      "year": "2018"
+    }
+  ],
+  "certifications": [
+    "AWS Certified Developer – Associate (2023)"
+  ],
+  "projects": [
+    {
+      "name": "OpenTrace API",
+      "description": "Open-source distributed tracing library for Python microservices with 800+ GitHub stars",
+      "technologies": ["Python", "Redis", "Docker", "OpenTelemetry"]
+    },
+    {
+      "name": "DevBoard",
+      "description": "Internal developer productivity dashboard aggregating metrics from Jira, GitHub, and PagerDuty",
+      "technologies": ["React", "Django", "PostgreSQL", "AWS Lambda"]
+    }
+  ]
+}

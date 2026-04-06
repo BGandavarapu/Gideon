@@ -1,0 +1,878 @@
+{% extends "base.html" %}
+{% block title %}Resumes — Gideon{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Resumes</h1>
+    <p class="page-subtitle" id="resumes-count-text">Loading…</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="loadTailoredResumes()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<!-- ── Mode selector ─────────────────────────────────────────────────── -->
+<section class="resume-mode-section">
+  <div class="resume-mode-cards" id="resume-mode-cards">
+    <!-- left card: sample (industry picker) -->
+    <div class="resume-mode-card" id="card-sample">
+      <div class="resume-mode-card-top">
+        <div class="resume-mode-icon">📋</div>
+        <div class="resume-mode-card-title">Sample Resume</div>
+        <div class="resume-mode-active-badge" id="badge-sample" style="display:none">── ACTIVE ──</div>
+      </div>
+      <p class="resume-mode-desc">
+        Try the app with a built-in resume for your industry.
+        <span class="sample-hint">Click any sample resume below to activate it.</span>
+      </p>
+
+      <div id="sample-active-preview" class="sample-industry-preview">
+        <div class="td-loading" style="font-size:12px">Loading…</div>
+      </div>
+
+      <div class="resume-mode-error" id="err-sample" style="display:none"></div>
+    </div>
+
+    <!-- right card: own -->
+    <div class="resume-mode-card" id="card-own">
+      <div class="resume-mode-card-top">
+        <div class="resume-mode-icon">👤</div>
+        <div class="resume-mode-card-title">My Own Resume</div>
+        <div class="resume-mode-active-badge" id="badge-own" style="display:none">── ACTIVE ──</div>
+      </div>
+      <p class="resume-mode-desc">
+        Upload your real resume for accurate matching and tailored results.
+      </p>
+
+      <!-- STATE A: no user resume yet -->
+      <div id="own-state-a" style="display:none">
+        <p class="resume-no-upload-hint">No resume uploaded yet.</p>
+        <div id="upload-drop-zone-a" class="upload-drop-zone"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event,'a')">
+          <div class="upload-drop-icon">📄</div>
+          <p class="upload-drop-text">Drop your resume PDF here or</p>
+          <label class="upload-browse-btn">
+            Browse
+            <input type="file" accept=".pdf" hidden id="file-input-a"
+                   onchange="onFileSelected(this,'a')">
+          </label>
+          <p class="upload-drop-hint">Must be a resume or CV — other documents will be rejected</p>
+        </div>
+        <div class="upload-name-row">
+          <input type="text" class="upload-name-input" id="upload-name-a"
+                 placeholder="Name (optional, e.g. &quot;Bhargav Resume&quot;)">
+        </div>
+        <button class="btn btn-primary upload-submit-btn" id="upload-btn-a"
+                onclick="uploadResume('a')" disabled>
+          Upload &amp; Parse Resume
+        </button>
+        <div class="upload-progress" id="upload-progress-a" style="display:none">
+          <div class="upload-progress-bar" id="upload-progress-bar-a"></div>
+        </div>
+        <div class="upload-error" id="upload-error-a" style="display:none"></div>
+        <button class="btn resume-mode-btn" id="btn-own" disabled
+                title="Upload your resume first">
+          Use My Resume
+        </button>
+      </div>
+
+      <!-- STATE B: user resume exists -->
+      <div id="own-state-b" style="display:none">
+        <div class="resume-user-info" id="user-resume-info">
+          <!-- populated by JS -->
+        </div>
+        <div class="resume-mode-error" id="err-own" style="display:none"></div>
+        <button class="btn resume-mode-btn" id="btn-own-b" onclick="switchMode('own')">
+          Use My Resume
+        </button>
+        <button class="btn btn-secondary resume-replace-btn" id="btn-replace"
+                onclick="toggleReplaceForm()">
+          ↑ Replace Resume
+        </button>
+
+        <!-- inline replace form (hidden by default) -->
+        <div id="replace-form" style="display:none; margin-top:12px">
+          <div class="upload-drop-zone"
+               ondragover="onDragOver(event)" ondragleave="onDragLeave(event)"
+               ondrop="onDrop(event,'b')">
+            <div class="upload-drop-icon">📄</div>
+            <p class="upload-drop-text">Drop your resume PDF here or</p>
+            <label class="upload-browse-btn">
+              Browse
+              <input type="file" accept=".pdf" hidden id="file-input-b"
+                     onchange="onFileSelected(this,'b')">
+            </label>
+            <p class="upload-drop-hint">Must be a resume or CV — other documents will be rejected</p>
+          </div>
+          <div class="upload-name-row">
+            <input type="text" class="upload-name-input" id="upload-name-b"
+                   placeholder="Name (optional)">
+          </div>
+          <button class="btn btn-primary upload-submit-btn" id="upload-btn-b"
+                  onclick="uploadResume('b')" disabled>
+            Upload &amp; Replace
+          </button>
+          <div class="upload-error" id="upload-error-b" style="display:none"></div>
+        </div>
+      </div>
+
+    </div><!-- /card-own -->
+  </div><!-- /resume-mode-cards -->
+
+  <!-- Toast -->
+  <div id="mode-toast" class="mode-toast" style="display:none"></div>
+</section>
+
+<!-- Advanced toggle link -->
+<div style="margin:8px 0 4px;text-align:right">
+  <a href="#" id="toggle-advanced" class="toggle-advanced-link" onclick="toggleAdvanced(event)">
+    ⚙ Advanced: customize search queries
+  </a>
+</div>
+
+<!-- ── Job Search Configuration (hidden by default) ─────────────────── -->
+<div id="advanced-search-section" style="display:none">
+<section class="dash-section job-search-config-section" style="margin-bottom:32px">
+  <div class="section-header" style="margin-bottom:16px">
+    <div>
+      <h2 class="section-title">Job Search Configuration</h2>
+      <p class="section-subtitle">Control what jobs get scraped and which resume is used for each role type.</p>
+    </div>
+  </div>
+  <div class="job-search-config-body">
+
+    <!-- Left: Search Configs -->
+    <div class="search-configs-panel">
+      <div class="panel-header">
+        <h3 class="panel-title">Search Configurations</h3>
+        <button class="btn btn-sm btn-ghost" id="add-config-btn" onclick="toggleAddConfigForm()">+ Add New</button>
+      </div>
+
+      <!-- Add Config Form (hidden by default) -->
+      <form id="add-config-form" class="config-add-form" style="display:none" onsubmit="saveNewConfig(event)">
+        <div class="form-row">
+          <label class="form-label">Keywords</label>
+          <input type="text" id="cfg-keywords" class="form-input" placeholder="e.g. product manager" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Location</label>
+          <input type="text" id="cfg-location" class="form-input" placeholder="e.g. San Francisco" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Domain</label>
+          <select id="cfg-domain" class="form-select">
+            <option value="software_engineering">Software Engineering</option>
+            <option value="ai_ml">AI / Machine Learning</option>
+            <option value="product_management">Product Management</option>
+            <option value="marketing">Marketing</option>
+            <option value="data_analytics">Data &amp; Analytics</option>
+            <option value="design">Design (UX/UI)</option>
+            <option value="finance">Finance &amp; Accounting</option>
+            <option value="sales">Sales</option>
+            <option value="operations">Operations</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Max Results</label>
+          <input type="number" id="cfg-max" class="form-input" value="20" min="1" max="100">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Save Config</button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="toggleAddConfigForm()">Cancel</button>
+        </div>
+        <div id="config-form-error" class="form-error" style="display:none"></div>
+      </form>
+
+      <!-- Config Cards -->
+      <div id="search-config-cards">
+        <div class="td-loading">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Right: Domain Resume Assignment -->
+    <div class="domain-resume-panel">
+      <div class="panel-header">
+        <h3 class="panel-title">Resume per Domain</h3>
+      </div>
+      <div id="domain-resume-rows">
+        <div class="td-loading">Loading…</div>
+      </div>
+    </div>
+
+  </div><!-- .job-search-config-body -->
+</section>
+</div><!-- #advanced-search-section -->
+
+<!-- ── Master resumes list ────────────────────────────────────────────── -->
+<section class="dash-section" style="margin-bottom:32px">
+  <div class="section-header">
+    <h2 class="section-title">Master Resumes</h2>
+  </div>
+  <div id="master-resumes-list" class="master-list">
+    <div class="td-loading">Loading…</div>
+  </div>
+</section>
+
+<!-- ── Tailored resumes table ─────────────────────────────────────────── -->
+<section class="dash-section">
+  <div class="section-header">
+    <h2 class="section-title">Tailored Resumes</h2>
+  </div>
+  <div class="table-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job Title</th>
+          <th>Company</th>
+          <th>Match Score</th>
+          <th>Generated</th>
+          <th>PDF</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tailored-tbody">
+        <tr><td colspan="6" class="td-loading">
+          <span class="loading-dots">Loading<span>.</span><span>.</span><span>.</span></span>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Mode card state ────────────────────────────────────────────────────────
+
+let _modeState = null;   // last result from GET /api/resume/mode
+let _selectedFiles = {}; // {a: File, b: File}
+
+// Expose _resumePageRefresh so activateResume (defined in main.js) can call it.
+window._resumePageRefresh = async function() {
+  await loadModeState();
+  await refreshSampleCardPreview();
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadModeState();
+  await refreshSampleCardPreview();
+  loadMasterResumes();
+  loadTailoredResumes();
+  loadSearchConfigs();
+  loadDomainResumes();
+});
+
+// ── Advanced toggle ────────────────────────────────────────────────────────
+
+function toggleAdvanced(event) {
+  if (event) event.preventDefault();
+  const section = document.getElementById('advanced-search-section');
+  const link    = document.getElementById('toggle-advanced');
+  if (!section) return;
+  const visible = section.style.display !== 'none';
+  section.style.display = visible ? 'none' : 'block';
+  link.textContent = visible
+    ? '⚙ Advanced: customize search queries'
+    : '⚙ Hide advanced options';
+}
+
+// ── Sample resume preview (synced to active resume) ───────────────────────
+
+async function refreshSampleCardPreview() {
+  const container = document.getElementById('sample-active-preview');
+  if (!container) return;
+  const st = _modeState;
+  if (!st) {
+    container.innerHTML = '<div class="td-loading" style="font-size:12px">Loading…</div>';
+    return;
+  }
+  if (st.mode !== 'sample') {
+    container.innerHTML = '<p class="text-secondary" style="font-size:12px;margin:0">Using your uploaded resume. Click a sample card below to try a built-in resume.</p>';
+    return;
+  }
+  const dom = st.sample_resume && st.sample_resume.domain;
+  if (!dom) {
+    container.innerHTML = '<p class="text-secondary" style="font-size:12px;margin:0">No active sample domain. Click a sample resume below.</p>';
+    return;
+  }
+  await fillSamplePreviewForDomain(dom, container);
+}
+
+async function fillSamplePreviewForDomain(domain, container) {
+  container.innerHTML = '<div class="td-loading" style="font-size:12px">Loading…</div>';
+  try {
+    const res = await fetch('/api/sample-resume/' + encodeURIComponent(domain));
+    if (!res.ok) {
+      container.innerHTML = '<p class="text-secondary" style="font-size:12px;margin:0">Preview unavailable.</p>';
+      return;
+    }
+    const data = await res.json();
+    const cfgs = data.industry_search_configs || [];
+    const shortCfg = cfgs.slice(0, 3).map(c => `"${esc(c.keywords)}"`).join(' · ');
+    const more = cfgs.length > 3 ? ` +${cfgs.length - 3} more` : '';
+    container.innerHTML = `
+      <div class="sample-preview-currently">Currently: <strong>${esc(data.name)}</strong></div>
+      <div class="sample-preview-persona">${esc(data.persona_name)} &middot; ${data.skills_count} skills &middot; ${data.experience_count} experience entries</div>
+      ${shortCfg ? `<div class="sample-preview-configs">Scraping: ${shortCfg}${more}</div>` : ''}
+    `;
+  } catch (e) {
+    container.innerHTML = '<p class="text-secondary" style="font-size:12px;margin:0">Preview unavailable.</p>';
+  }
+}
+
+// activateResume is defined in main.js and exposed on window there.
+
+async function loadModeState() {
+  try {
+    const res  = await fetch('/api/resume/mode');
+    _modeState = await res.json();
+    renderModeCards(_modeState);
+  } catch (e) {
+    console.error('Could not load resume mode:', e);
+  }
+}
+
+function renderModeCards(data) {
+  const mode         = data.mode || 'sample';
+  const sampleResume = data.sample_resume;
+  const userResume   = data.user_resume;
+
+  // Show correct state for own card
+  const stateA = document.getElementById('own-state-a');
+  const stateB = document.getElementById('own-state-b');
+  if (userResume) {
+    stateA.style.display = 'none';
+    stateB.style.display = 'block';
+    const uInfo = document.getElementById('user-resume-info');
+    const ca    = userResume.created_at ? timeAgo(new Date(userResume.created_at)) : '';
+    const domDisplay = {
+      software_engineering: 'Software Engineering', ai_ml: 'AI / ML',
+      product_management: 'Product Management', marketing: 'Marketing',
+      data_analytics: 'Data & Analytics', design: 'Design (UX/UI)',
+      finance: 'Finance', sales: 'Sales', operations: 'Operations', other: 'Other',
+    };
+    // currentDomains: prefer multi-domain array, fall back to single domain
+    const currentDomains = Array.isArray(userResume.domains) && userResume.domains.length
+      ? userResume.domains.filter(d => d && d !== 'other')
+      : (userResume.domain && userResume.domain !== 'other' ? [userResume.domain] : []);
+    const isOtherDom = currentDomains.length === 0;
+    const domainBadgesHtml = currentDomains.map(d =>
+      `<span class="domain-badge domain-badge-sm">${esc(domDisplay[d] || d)}</span>`
+    ).join(' ');
+    uInfo.innerHTML = `
+      <div class="user-resume-name">${esc(userResume.name)}</div>
+      <div class="user-resume-meta">${ca ? 'Uploaded ' + ca : ''}
+        ${userResume.skills_count ? ' · Skills: ' + userResume.skills_count : ''}
+      </div>
+      <div class="user-resume-domain-row">
+        ${isOtherDom
+          ? `<span class="domain-badge domain-badge-sm domain-badge-warn">No domain</span>
+             <button class="btn btn-xs btn-warning inline-domain-btn"
+               onclick="showInlineDomainOverride(${userResume.id}, [])">Set Domains</button>`
+          : `${domainBadgesHtml}
+             <button class="btn btn-xs btn-ghost inline-domain-btn"
+               onclick="showInlineDomainOverride(${userResume.id}, ${JSON.stringify(currentDomains)})">Edit</button>`
+        }
+      </div>
+      ${!isOtherDom ? `<div id="own-search-preview" class="own-search-preview">Loading…</div>` : ''}
+      <div id="inline-domain-override"></div>`;
+
+    // Populate the search preview asynchronously
+    if (!isOtherDom) {
+      fetch('/api/active-context')
+        .then(r => r.json())
+        .then(ctx => {
+          const el = document.getElementById('own-search-preview');
+          if (!el) return;
+          const cfgs = ctx.industry_search_configs || [];
+          if (cfgs.length) {
+            el.textContent = 'Searches: ' + cfgs.map(c => '"' + c.keywords + '"').join(' · ');
+          } else {
+            el.textContent = '';
+          }
+        })
+        .catch(() => {
+          const el = document.getElementById('own-search-preview');
+          if (el) el.textContent = '';
+        });
+    }
+  } else {
+    stateA.style.display = 'block';
+    stateB.style.display = 'none';
+  }
+
+  // Apply active/inactive styling
+  applyActiveCard(mode);
+}
+
+function applyActiveCard(mode) {
+  const cardSample = document.getElementById('card-sample');
+  const cardOwn    = document.getElementById('card-own');
+  const badgeSample = document.getElementById('badge-sample');
+  const badgeOwn    = document.getElementById('badge-own');
+  const btnOwnB     = document.getElementById('btn-own-b');
+  const btnOwnA     = document.getElementById('btn-own');   // disabled in state A
+
+  cardSample.classList.toggle('resume-mode-card-active',  mode === 'sample');
+  cardOwn.classList.toggle('resume-mode-card-active',     mode === 'own');
+
+  badgeSample.style.display = mode === 'sample' ? 'block' : 'none';
+  badgeOwn.style.display    = mode === 'own'    ? 'block' : 'none';
+
+  // Own button (state B)
+  if (btnOwnB) {
+    const hasUser = !!(_modeState && _modeState.user_resume);
+    btnOwnB.disabled = !hasUser || mode === 'own';
+    btnOwnB.textContent = mode === 'own' ? '✓ Currently Active' : 'Use My Resume';
+    btnOwnB.className = 'btn resume-mode-btn' + (mode === 'own' ? ' btn-active-disabled' : '');
+  }
+}
+
+async function switchMode(mode) {
+  const btnId = mode === 'sample' ? 'btn-sample' : 'btn-own-b';
+  const btn   = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  clearErrors();
+  try {
+    const res  = await fetch('/api/resume/mode', {
+      method:  'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const errEl = document.getElementById('err-' + (mode === 'sample' ? 'sample' : 'own'));
+      if (errEl) { errEl.textContent = data.error || 'Switch failed'; errEl.style.display = 'block'; }
+      if (btn) { btn.disabled = false; btn.textContent = mode === 'sample' ? 'Use Sample Resume' : 'Use My Resume'; }
+      return;
+    }
+    showModeToast('✓ ' + (mode === 'sample' ? 'Using sample resume' : 'Using your resume'));
+    await loadModeState();
+    await refreshSampleCardPreview();
+  } catch (e) {
+    showModeToast('❌ Network error', 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Upload logic ───────────────────────────────────────────────────────────
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onDrop(e, slot) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) acceptFile(file, slot);
+}
+function onFileSelected(input, slot) {
+  if (input.files[0]) acceptFile(input.files[0], slot);
+}
+
+function acceptFile(file, slot) {
+  _selectedFiles[slot] = file;
+  const btn = document.getElementById('upload-btn-' + slot);
+  const err = document.getElementById('upload-error-' + slot);
+  if (err) err.style.display = 'none';
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    if (err) { err.textContent = 'Only PDF files are supported.'; err.style.display = 'block'; }
+    if (btn) btn.disabled = true;
+    return;
+  }
+  if (btn) btn.disabled = false;
+  // Show filename in drop zone
+  const zone = document.getElementById('upload-drop-zone-' + slot);
+  if (zone) {
+    const p = zone.querySelector('.upload-drop-text');
+    if (p) p.textContent = '📎 ' + file.name;
+  }
+}
+
+async function uploadResume(slot) {
+  const file = _selectedFiles[slot];
+  if (!file) return;
+
+  const name    = (document.getElementById('upload-name-' + slot) || {}).value || '';
+  const btn     = document.getElementById('upload-btn-' + slot);
+  const errEl   = document.getElementById('upload-error-' + slot);
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  if (errEl) errEl.style.display = 'none';
+
+  const form = new FormData();
+  form.append('file', file);
+  if (name) form.append('name', name);
+
+  try {
+    const res  = await fetch('/api/resume/upload', { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok) {
+      let msg;
+      if (data.error === 'not_a_resume') {
+        if (data.document_type && data.document_type !== 'unknown') {
+          msg = `⚠️ This doesn't look like a resume. We detected it as: <strong>${esc(data.document_type)}</strong>.<br>Please upload a resume or CV in PDF format.`;
+        } else {
+          msg = `⚠️ We couldn't confidently identify this as a resume. Please upload a standard resume or CV.`;
+        }
+      } else {
+        msg = data.message || data.error || 'Upload failed. Please try again.';
+      }
+      if (errEl) { errEl.innerHTML = msg; errEl.style.display = 'block'; }
+      btn.disabled = false;
+      btn.textContent = slot === 'a' ? 'Upload & Parse Resume' : 'Upload & Replace';
+      return;
+    }
+
+    showModeToast('✓ Resume uploaded and activated');
+
+    // Show domain banner if detection was uncertain or failed
+    _showDomainBanner(data.id, data.domain, data.domain_confidence);
+
+    // Show style profile card if fingerprint was returned
+    if (data.style && Object.keys(data.style).length) {
+      _showStyleCard(data.style, data.name || 'Your Resume');
+    }
+
+    await loadModeState();
+    await refreshSampleCardPreview();
+    // Reload master resumes list
+    loadMasterResumes();
+
+    // Collapse replace form if in state B
+    const rf = document.getElementById('replace-form');
+    if (rf) rf.style.display = 'none';
+
+    // Reset file inputs
+    _selectedFiles[slot] = null;
+    btn.disabled = true;
+    btn.textContent = slot === 'a' ? 'Upload & Parse Resume' : 'Upload & Replace';
+
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.textContent = slot === 'a' ? 'Upload & Parse Resume' : 'Upload & Replace';
+  }
+}
+
+function toggleReplaceForm() {
+  const rf  = document.getElementById('replace-form');
+  const btn = document.getElementById('btn-replace');
+  if (!rf) return;
+  const vis = rf.style.display !== 'none';
+  rf.style.display = vis ? 'none' : 'block';
+  btn.textContent  = vis ? '↑ Replace Resume' : '↑ Cancel';
+}
+
+function clearErrors() {
+  ['err-sample', 'err-own', 'upload-error-a', 'upload-error-b'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+
+function showModeToast(msg, type) {
+  const t = document.getElementById('mode-toast');
+  if (!t) return;
+  t.textContent  = msg;
+  t.className    = 'mode-toast mode-toast-' + (type || 'success');
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+window.showModeToast = showModeToast;
+
+// ── Domain banner (shown after upload when detection is uncertain) ─────────
+
+const _DOMAIN_OPTIONS = [
+  ['software_engineering', 'Software Engineering'],
+  ['ai_ml',               'AI / Machine Learning'],
+  ['product_management',  'Product Management'],
+  ['marketing',           'Marketing'],
+  ['data_analytics',      'Data & Analytics'],
+  ['design',              'Design (UX/UI)'],
+  ['finance',             'Finance & Accounting'],
+  ['sales',               'Sales'],
+  ['operations',          'Operations'],
+];
+
+// Render checkboxes for multi-domain selection inside banners / inline forms.
+// preselected: array of domain value strings to pre-check.
+function _domainCheckboxHtml(containerId, preselected) {
+  return `<div class="domain-checkbox-list" id="${containerId}">
+    ${_DOMAIN_OPTIONS.map(([val, label]) =>
+      `<label class="domain-checkbox-item">
+        <input type="checkbox" value="${val}"${preselected.includes(val) ? ' checked' : ''}>
+        ${esc(label)}
+      </label>`
+    ).join('')}
+  </div>`;
+}
+
+function _showDomainBanner(resumeId, domain, confidence) {
+  const old = document.getElementById('domain-banner');
+  if (old) old.remove();
+
+  const isOther = !domain || domain === 'other';
+  const lowConf = !isOther && (confidence == null || confidence < 0.5);
+
+  const banner = document.createElement('div');
+  banner.id = 'domain-banner';
+
+  if (!isOther && !lowConf) {
+    // Confident detection — show green success banner with search queries
+    const domLabel = _DOMAIN_OPTIONS.find(([v]) => v === domain)?.[1] || domain;
+    const pct = Math.round((confidence || 0) * 100);
+    banner.className = 'domain-banner domain-banner-success';
+    banner.innerHTML = `
+      <div class="domain-banner-icon">✓</div>
+      <div class="domain-banner-body">
+        <strong>Detected: ${esc(domLabel)}</strong> (${pct}% confidence)
+        <div id="domain-banner-searches" class="domain-banner-searches">Loading search queries…</div>
+        <div class="domain-banner-row" style="margin-top:8px">
+          <a href="/" class="btn btn-sm btn-primary">Go to Dashboard → Scrape Jobs</a>
+          <span class="domain-banner-hint">Want to add more domains? Use the ✎ button on the card below.</span>
+        </div>
+      </div>
+      <button class="domain-banner-close" onclick="document.getElementById('domain-banner').remove()">✕</button>
+    `;
+    const modeSection = document.querySelector('.resume-mode-section');
+    if (modeSection) modeSection.after(banner);
+    else document.querySelector('.content')?.prepend(banner);
+    banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Fetch the actual search configs that will be used
+    fetch('/api/active-context')
+      .then(r => r.json())
+      .then(ctx => {
+        const el = document.getElementById('domain-banner-searches');
+        if (!el) return;
+        const cfgs = ctx.industry_search_configs || [];
+        if (cfgs.length) {
+          const chips = cfgs.map(c => `<span class="search-query-chip">"${esc(c.keywords)}"</span>`).join(' · ');
+          el.innerHTML = 'Will scrape: ' + chips;
+        } else {
+          el.textContent = 'No built-in searches for this domain — add one in Advanced.';
+        }
+      })
+      .catch(() => {
+        const el = document.getElementById('domain-banner-searches');
+        if (el) el.textContent = '';
+      });
+    return;
+  }
+
+  if (isOther) {
+    banner.className = 'domain-banner domain-banner-error';
+    banner.innerHTML = `
+      <div class="domain-banner-icon">⚠</div>
+      <div class="domain-banner-body">
+        <strong>Industry not detected.</strong>
+        Without a domain, no jobs will be scraped for this resume.
+        Select one or more industries below:
+        ${_domainCheckboxHtml('domain-banner-checkboxes', [])}
+        <div class="domain-banner-row" style="margin-top:6px">
+          <button class="btn btn-sm btn-primary" onclick="_saveDomainsFromBanner(${resumeId})">Save Domains</button>
+        </div>
+        <div class="domain-banner-err" id="domain-banner-err" style="display:none"></div>
+      </div>
+      <button class="domain-banner-close" onclick="document.getElementById('domain-banner').remove()">✕</button>
+    `;
+  } else {
+    const domLabel = _DOMAIN_OPTIONS.find(([v]) => v === domain)?.[1] || domain;
+    const pct = Math.round((confidence || 0) * 100);
+    banner.className = 'domain-banner domain-banner-warn';
+    banner.innerHTML = `
+      <div class="domain-banner-icon">ℹ</div>
+      <div class="domain-banner-body">
+        Detected as <strong>${esc(domLabel)}</strong> (${pct}% confidence) — not quite right?
+        Select all that apply:
+        ${_domainCheckboxHtml('domain-banner-checkboxes', [domain])}
+        <div class="domain-banner-row" style="margin-top:6px">
+          <button class="btn btn-sm btn-secondary" onclick="_saveDomainsFromBanner(${resumeId})">Update Domains</button>
+        </div>
+        <div class="domain-banner-err" id="domain-banner-err" style="display:none"></div>
+      </div>
+      <button class="domain-banner-close" onclick="document.getElementById('domain-banner').remove()">✕</button>
+    `;
+  }
+
+  const modeSection = document.querySelector('.resume-mode-section');
+  if (modeSection) modeSection.after(banner);
+  else document.querySelector('.content')?.prepend(banner);
+  banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function _saveDomainsFromBanner(resumeId) {
+  const container = document.getElementById('domain-banner-checkboxes');
+  const errEl     = document.getElementById('domain-banner-err');
+  const checked   = container
+    ? [...container.querySelectorAll('input[type=checkbox]:checked')].map(el => el.value)
+    : [];
+  if (!checked.length) {
+    if (errEl) { errEl.textContent = 'Please select at least one domain.'; errEl.style.display = 'block'; }
+    return;
+  }
+  try {
+    const res  = await fetch(`/api/resume/${resumeId}/domain`, {
+      method:  'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ domains: checked }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (errEl) { errEl.textContent = data.error || 'Save failed.'; errEl.style.display = 'block'; }
+      return;
+    }
+    document.getElementById('domain-banner')?.remove();
+    showModeToast('✓ Domains saved');
+    loadMasterResumes();
+    await loadModeState();
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block'; }
+  }
+}
+
+// Inline domain override shown in own-state-b (multi-domain checkbox list)
+function showInlineDomainOverride(resumeId, currentDomains) {
+  const container = document.getElementById('inline-domain-override');
+  if (!container) return;
+  const pre = Array.isArray(currentDomains) ? currentDomains : [];
+  container.innerHTML = `
+    <div class="domain-inline-form">
+      ${_domainCheckboxHtml('inline-domain-checkboxes', pre)}
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <button class="btn btn-xs btn-primary" onclick="_saveInlineDomains(${resumeId})">Save</button>
+        <button class="btn btn-xs btn-ghost" onclick="document.getElementById('inline-domain-override').innerHTML=''">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+async function _saveInlineDomains(resumeId) {
+  const container = document.getElementById('inline-domain-checkboxes');
+  const checked = container
+    ? [...container.querySelectorAll('input[type=checkbox]:checked')].map(el => el.value)
+    : [];
+  if (!checked.length) {
+    showModeToast('❌ Select at least one domain', 'error');
+    return;
+  }
+  const res  = await fetch(`/api/resume/${resumeId}/domain`, {
+    method:  'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({ domains: checked }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showModeToast('✓ Domains saved');
+    await loadModeState();
+    loadMasterResumes();
+  } else {
+    showModeToast('❌ ' + (data.error || 'Save failed'), 'error');
+  }
+}
+
+// ── Style card ─────────────────────────────────────────────────────────────
+
+function _showStyleCard(style, resumeName) {
+  // Remove any existing card
+  const old = document.getElementById('style-profile-card');
+  if (old) old.remove();
+
+  const voiceLabels = {
+    'first_person': 'First person (I, my, me)',
+    'third_person': 'Third person',
+    'no_pronouns':  'No pronouns (action verbs)',
+  };
+  const structureLabels = {
+    'punchy':   'Punchy',
+    'moderate': 'Moderate',
+    'detailed': 'Detailed',
+  };
+  const metricLabels = {
+    'heavy':    'Heavy (data-driven)',
+    'moderate': 'Moderate',
+    'light':    'Light (qualitative)',
+  };
+  const bulletLabels = {
+    '•': '• Bullet',
+    '-': '- Dash',
+    '*': '* Asterisk',
+    '—': '— Em dash',
+    'none': 'Plain text',
+  };
+
+  const card = document.createElement('div');
+  card.id = 'style-profile-card';
+  card.className = 'style-profile-card';
+  card.innerHTML = `
+    <div class="style-profile-header">
+      <span class="style-profile-title">Detected Style Profile</span>
+      <button class="style-profile-close" onclick="document.getElementById('style-profile-card').remove()">✕</button>
+    </div>
+    <div class="style-profile-rows">
+      <div class="style-profile-row">
+        <span class="style-profile-label">Voice</span>
+        <span class="style-profile-value">${esc(voiceLabels[style.voice] || style.voice || '—')}</span>
+      </div>
+      <div class="style-profile-row">
+        <span class="style-profile-label">Structure</span>
+        <span class="style-profile-value">${esc(structureLabels[style.structure] || style.structure || '—')}</span>
+      </div>
+      <div class="style-profile-row">
+        <span class="style-profile-label">Metrics</span>
+        <span class="style-profile-value">${esc(metricLabels[style.metrics] || style.metrics || '—')}</span>
+      </div>
+      <div class="style-profile-row">
+        <span class="style-profile-label">Bullets</span>
+        <span class="style-profile-value">${esc(bulletLabels[style.bullet_char] || style.bullet_char || '—')}</span>
+      </div>
+    </div>
+    <p class="style-profile-note">These constraints will be applied to every future tailoring of ${esc(resumeName)}.</p>
+  `;
+
+  // Insert after the mode cards section
+  const modeSection = document.querySelector('.resume-mode-section');
+  if (modeSection) {
+    modeSection.after(card);
+  } else {
+    document.querySelector('.content')?.prepend(card);
+  }
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 5)    return 'just now';
+  if (secs < 60)   return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + ' min ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + ' hr ago';
+  return Math.floor(secs / 86400) + ' days ago';
+}
+
+// activateResume is defined and exposed as window.activateResume in main.js.
+// showModeToast is exposed as window.showModeToast above.
+</script>
+{% endblock %}

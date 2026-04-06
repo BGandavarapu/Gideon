@@ -1,0 +1,65 @@
+{
+  "personal_info": {
+    "name": "John Developer",
+    "email": "john.dev@example.com",
+    "phone": "555-0123",
+    "location": "San Francisco, CA",
+    "linkedin": "linkedin.com/in/johndeveloper"
+  },
+  "professional_summary": "Experienced software engineer with 5 years of Python development and web application expertise. Proficient in building scalable backend systems and RESTful APIs.",
+  "work_experience": [
+    {
+      "title": "Software Engineer",
+      "company": "Tech Innovations Inc",
+      "location": "San Francisco, CA",
+      "dates": "2020-2024",
+      "bullets": [
+        "Developed web applications using Python and Django framework",
+        "Built RESTful APIs serving 10,000 daily active users",
+        "Optimised PostgreSQL database queries reducing latency by 35%",
+        "Deployed microservices on AWS using Docker and Kubernetes",
+        "Implemented automated testing with pytest achieving 85% code coverage",
+        "Collaborated with cross-functional teams on feature specifications"
+      ]
+    },
+    {
+      "title": "Junior Developer",
+      "company": "StartupCo",
+      "location": "San Francisco, CA",
+      "dates": "2018-2020",
+      "bullets": [
+        "Created data processing scripts using Python and Apache Kafka",
+        "Maintained cloud infrastructure on AWS and GCP",
+        "Participated in code reviews and sprint planning",
+        "Worked with computer vision models for image classification"
+      ]
+    }
+  ],
+  "skills": [
+    "Python", "Django", "PostgreSQL", "Git", "REST APIs",
+    "Docker", "Kubernetes", "AWS", "GCP", "Kafka",
+    "Machine Learning", "Microservices", "Terraform", "JavaScript"
+  ],
+  "education": [
+    {
+      "degree": "BS Computer Science",
+      "school": "University of California",
+      "year": "2018"
+    }
+  ],
+  "certifications": [
+    "AWS Certified Developer - Associate (2022)"
+  ],
+  "projects": [
+    {
+      "name": "Real-Time Event Pipeline",
+      "description": "Designed and deployed a real-time event processing pipeline using Kafka, AWS Kinesis, and Python that handles 500k events/day.",
+      "tech": ["Python", "Kafka", "AWS", "PostgreSQL"]
+    },
+    {
+      "name": "Computer Vision Safety Tool",
+      "description": "Built a computer vision application using Python and TensorFlow to detect safety hazards in workplace images.",
+      "tech": ["Python", "TensorFlow", "OpenCV", "GCP"]
+    }
+  ]
+}

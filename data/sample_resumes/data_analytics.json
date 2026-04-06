@@ -1,0 +1,73 @@
+{
+  "personal_info": {
+    "name": "Marcus Chen",
+    "email": "marcus.chen@email.com",
+    "phone": "(206) 555-0738",
+    "location": "Seattle, WA",
+    "linkedin": "linkedin.com/in/marcuschen-analytics"
+  },
+  "professional_summary": "Business intelligence and analytics professional with 5 years of experience transforming complex datasets into actionable insights for product and executive teams. Expert in SQL, Python, and Tableau with deep experience in building self-serve analytics infrastructure using Snowflake, dbt, and BigQuery.",
+  "work_experience": [
+    {
+      "title": "Senior Data Analyst",
+      "company": "Meridian Commerce",
+      "location": "Seattle, WA",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Built end-to-end ETL pipelines using dbt and Snowflake transforming 50+ raw data sources into clean analytics models",
+        "Designed Tableau dashboards and Looker reports used by 200+ employees for daily business intelligence decisions",
+        "Ran A/B testing framework analyzing 30+ experiments quarterly, driving 15% improvement in checkout conversion",
+        "Conducted statistical analysis and regression analysis identifying $1.2M in recoverable revenue from pricing model flaws",
+        "Mentored team of 2 junior analysts in SQL best practices and data visualization standards"
+      ]
+    },
+    {
+      "title": "Data Analyst",
+      "company": "Vertex Financial Tech",
+      "location": "San Francisco, CA",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Wrote 200+ complex SQL queries in BigQuery and Redshift for ad-hoc analysis and executive reporting",
+        "Built Python and R scripts for cohort analysis, funnel analysis, and customer lifetime value modeling",
+        "Created Power BI dashboards for finance team reducing monthly reporting time from 3 days to 4 hours",
+        "Implemented data pipeline monitoring using Apache Airflow, achieving 99.7% pipeline uptime"
+      ]
+    },
+    {
+      "title": "Junior Business Analyst",
+      "company": "InsightBridge Analytics",
+      "location": "Portland, OR",
+      "dates": "2019 – 2020",
+      "bullets": [
+        "Performed data visualization and exploratory data analysis using Python (pandas, matplotlib) and Excel",
+        "Maintained business intelligence dashboards in Tableau tracking 25 core KPIs for operations team",
+        "Automated weekly reporting with Python scripts saving 8 hours per week of manual data processing",
+        "Collaborated with data engineering team to define data modeling standards for the analytics warehouse"
+      ]
+    }
+  ],
+  "skills": [
+    "SQL", "Python", "R", "Tableau", "Power BI", "dbt", "Snowflake",
+    "BigQuery", "Excel", "Statistical Analysis", "A/B Testing",
+    "Data Visualization", "ETL", "Looker",
+    "Apache Airflow", "Redshift", "Databricks", "Pandas"
+  ],
+  "education": [
+    {
+      "degree": "B.S. Statistics",
+      "institution": "University of Washington",
+      "year": "2019"
+    }
+  ],
+  "certifications": [
+    "dbt Analytics Engineering Certification",
+    "Tableau Desktop Specialist"
+  ],
+  "projects": [
+    {
+      "name": "OpenMetrics Framework",
+      "description": "Open-source dbt package for standardizing e-commerce analytics metrics across Snowflake and BigQuery",
+      "technologies": ["dbt", "SQL", "Python", "Snowflake"]
+    }
+  ]
+}

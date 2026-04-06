@@ -1,0 +1,79 @@
+{
+  "personal_info": {
+    "name": "Priya Sharma",
+    "email": "priya.sharma@email.com",
+    "phone": "(650) 555-0247",
+    "location": "Palo Alto, CA",
+    "linkedin": "linkedin.com/in/priyasharma-ml",
+    "github": "github.com/priyasharma"
+  },
+  "professional_summary": "Machine learning engineer with 5 years of experience developing and deploying production ML systems across NLP, computer vision, and recommendation domains. Proficient in PyTorch, TensorFlow, and large language model fine-tuning. Led end-to-end ML pipelines from data ingestion to model serving at scale using AWS SageMaker and MLflow.",
+  "work_experience": [
+    {
+      "title": "Senior Machine Learning Engineer",
+      "company": "Inference AI",
+      "location": "Palo Alto, CA",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Fine-tuned LLMs (LLaMA, Mistral) for domain-specific Q&A using RAG and vector databases, improving retrieval accuracy by 42%",
+        "Built production NLP pipeline processing 5M+ documents daily using Hugging Face transformers and Apache Spark",
+        "Reduced model inference latency by 60% through quantization, ONNX export, and TensorRT optimization",
+        "Designed MLflow experiment tracking and model registry for 12-person ML team, cutting model retraining time by 35%",
+        "Implemented automated model monitoring with drift detection, triggering retraining when accuracy degraded below threshold"
+      ]
+    },
+    {
+      "title": "Machine Learning Engineer",
+      "company": "DataSense Corp",
+      "location": "Mountain View, CA",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Developed computer vision models (object detection, image segmentation) achieving 94% precision on benchmark datasets",
+        "Built and deployed recommendation system using collaborative filtering and matrix factorization, increasing CTR by 18%",
+        "Trained scikit-learn and XGBoost models for fraud detection, reducing false positives by 27%",
+        "Managed end-to-end ML workflows on AWS SageMaker with automated hyperparameter tuning"
+      ]
+    },
+    {
+      "title": "Data Scientist",
+      "company": "Quantex Analytics",
+      "location": "San Francisco, CA",
+      "dates": "2019 – 2020",
+      "bullets": [
+        "Built statistical models in Python and R to forecast customer churn with 89% accuracy",
+        "Performed large-scale data analysis using PySpark on Hadoop cluster processing 2TB+ daily data",
+        "Created interactive ML experiment dashboards using Streamlit and Plotly for stakeholder reporting",
+        "Collaborated with engineers to deploy 3 models into production using FastAPI and Docker"
+      ]
+    }
+  ],
+  "skills": [
+    "Python", "PyTorch", "TensorFlow", "scikit-learn", "NLP",
+    "Computer Vision", "MLflow", "Spark", "SQL", "AWS SageMaker",
+    "Hugging Face", "LLMs", "RAG", "Vector Databases",
+    "ONNX", "Docker", "Kubernetes", "R"
+  ],
+  "education": [
+    {
+      "degree": "M.S. Computer Science (Machine Learning)",
+      "institution": "Stanford University",
+      "year": "2019"
+    },
+    {
+      "degree": "B.Tech. Computer Engineering",
+      "institution": "IIT Bombay",
+      "year": "2017"
+    }
+  ],
+  "certifications": [
+    "AWS Certified Machine Learning – Specialty (2023)",
+    "TensorFlow Developer Certificate (2022)"
+  ],
+  "projects": [
+    {
+      "name": "MultiModal RAG System",
+      "description": "Production RAG pipeline combining text and image embeddings with Pinecone and GPT-4V for enterprise document search",
+      "technologies": ["Python", "LangChain", "Pinecone", "OpenAI", "FastAPI"]
+    }
+  ]
+}

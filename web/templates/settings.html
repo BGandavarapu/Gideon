@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Settings — Gideon{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">Manage automation preferences for your pipeline</p>
+  </div>
+</div>
+
+<!-- ── Automation Mode ────────────────────────────────────────── -->
+<div class="settings-section">
+  <div class="settings-section-header">
+    <h2 class="section-title">Automation Mode</h2>
+    <p class="settings-section-desc">
+      Control whether tasks run on a schedule automatically or only when
+      you click them in the dashboard.
+    </p>
+  </div>
+
+  <!-- Scrape Jobs card -->
+  <div class="settings-card" id="card-scrape">
+    <div class="settings-card-top">
+      <div class="settings-card-label">
+        <span class="settings-card-icon">🔍</span>
+        <div>
+          <div class="settings-card-title">Job Scraping</div>
+          <div class="settings-card-sub">Searches LinkedIn for new job postings</div>
+        </div>
+      </div>
+      <div class="settings-toggle-group" id="toggle-scrape">
+        <button class="toggle-btn toggle-btn-manual active" data-task="scrape" data-mode="manual"
+                onclick="setMode('scrape','manual')">Manual</button>
+        <button class="toggle-btn toggle-btn-auto" data-task="scrape" data-mode="automatic"
+                onclick="setMode('scrape','automatic')">Automatic</button>
+      </div>
+    </div>
+
+    <div class="settings-schedule-row" id="schedule-row-scrape" style="display:none">
+      <label class="settings-schedule-label" for="sched-scrape">
+        Schedule time
+      </label>
+      <input class="settings-schedule-input" id="sched-scrape" type="time"
+             value="09:00" onblur="setSchedule('scrape', this.value)">
+      <span class="settings-save-flash" id="flash-scrape-sched" style="display:none">Saved ✓</span>
+    </div>
+
+    <div class="settings-status-row">
+      <span class="settings-status-dot" id="dot-scrape"></span>
+      <span class="settings-status-text" id="status-scrape">Running manually</span>
+      <span class="settings-save-flash" id="flash-scrape" style="display:none">Saved ✓</span>
+    </div>
+  </div>
+
+  <!-- Generate Resumes card -->
+  <div class="settings-card" id="card-generate">
+    <div class="settings-card-top">
+      <div class="settings-card-label">
+        <span class="settings-card-icon">📄</span>
+        <div>
+          <div class="settings-card-title">Resume Generation</div>
+          <div class="settings-card-sub">Auto-generates tailored resumes for high-match jobs</div>
+        </div>
+      </div>
+      <div class="settings-toggle-group" id="toggle-generate">
+        <button class="toggle-btn toggle-btn-manual active" data-task="generate" data-mode="manual"
+                onclick="setMode('generate','manual')">Manual</button>
+        <button class="toggle-btn toggle-btn-auto" data-task="generate" data-mode="automatic"
+                onclick="setMode('generate','automatic')">Automatic</button>
+      </div>
+    </div>
+
+    <div class="settings-schedule-row" id="schedule-row-generate" style="display:none">
+      <label class="settings-schedule-label" for="sched-generate">
+        Schedule time
+      </label>
+      <input class="settings-schedule-input" id="sched-generate" type="time"
+             value="10:00" onblur="setSchedule('generate', this.value)">
+      <span class="settings-save-flash" id="flash-generate-sched" style="display:none">Saved ✓</span>
+    </div>
+
+    <div class="settings-status-row">
+      <span class="settings-status-dot" id="dot-generate"></span>
+      <span class="settings-status-text" id="status-generate">Running manually</span>
+      <span class="settings-save-flash" id="flash-generate" style="display:none">Saved ✓</span>
+    </div>
+  </div>
+
+  <!-- Job Analysis card — always automatic, not toggleable -->
+  <div class="settings-card settings-card-readonly">
+    <div class="settings-card-top">
+      <div class="settings-card-label">
+        <span class="settings-card-icon">🧠</span>
+        <div>
+          <div class="settings-card-title">Job Analysis</div>
+          <div class="settings-card-sub">Runs automatically after each scrape</div>
+        </div>
+      </div>
+      <span class="settings-always-badge">Always Auto</span>
+    </div>
+    <div class="settings-status-row">
+      <span class="settings-status-dot settings-dot-auto"></span>
+      <span class="settings-status-text">This cannot be changed.</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Resume Mode ────────────────────────────────────────────── -->
+<div class="settings-section" style="margin-top:24px">
+  <div class="settings-section-header">
+    <h2 class="section-title">Resume</h2>
+    <p class="settings-section-desc">
+      Switch between the built-in sample resume and your own uploaded resume.
+    </p>
+  </div>
+
+  <div class="settings-resume-section">
+    <div class="settings-resume-row">
+      <span>Active Mode:</span>
+      <span class="settings-resume-mode-value" id="resume-mode-display">Loading…</span>
+      <a href="{{ url_for('resumes_page') }}" class="settings-resume-link">Manage →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Preferred Scraping Location ────────────────────────────── -->
+<div class="settings-section" style="margin-top:24px">
+  <div class="settings-section-header">
+    <h2 class="section-title">Scraping Location</h2>
+    <p class="settings-section-desc">
+      Where to search for jobs. Applies to all built-in industry search configs.
+      Leave blank to use the defaults (Remote, San Francisco, New York).
+    </p>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-top">
+      <div class="settings-card-label">
+        <span class="settings-card-icon">📍</span>
+        <div>
+          <div class="settings-card-title">Preferred Location</div>
+          <div class="settings-card-sub">City, country, region, or "Remote"</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <input
+        type="text"
+        id="preferred-location-input"
+        class="settings-schedule-input"
+        placeholder="e.g. Remote, New York, London, United Kingdom"
+        style="max-width:320px;flex:1;font-size:13px"
+      >
+      <button id="save-location-btn" class="btn btn-primary btn-sm" onclick="saveLocation()">
+        Save
+      </button>
+      <span class="settings-save-flash" id="flash-location" style="display:none">Saved ✓</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Footer: last updated ──────────────────────────────────── -->
+<p class="settings-footer" id="settings-footer">Loading…</p>
+
+<script>
+// ── Settings page JS ─────────────────────────────────────────────────────────
+
+async function loadSettings() {
+  try {
+    const [settingsRes, modeRes, locRes] = await Promise.all([
+      fetch('/api/settings'),
+      fetch('/api/resume/mode'),
+      fetch('/api/settings/location'),
+    ]);
+    const data     = await settingsRes.json();
+    const modeData = await modeRes.json();
+    const locData  = await locRes.json();
+    applySettings(data);
+    const lu = data.last_updated ? timeAgo(new Date(data.last_updated)) : 'never';
+    document.getElementById('settings-footer').textContent = 'Last updated: ' + lu;
+    applyResumeMode(modeData);
+    const locInput = document.getElementById('preferred-location-input');
+    if (locInput) locInput.value = locData.preferred_location || '';
+  } catch (e) {
+    document.getElementById('settings-footer').textContent = 'Could not load settings.';
+  }
+}
+
+async function saveLocation() {
+  const input = document.getElementById('preferred-location-input');
+  const location = input ? input.value.trim() : '';
+  const btn = document.getElementById('save-location-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/settings/location', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ preferred_location: location }),
+    });
+    if (res.ok) {
+      showFlash('flash-location');
+    } else {
+      const err = await res.json();
+      showInlineError('location', err.error || 'Failed to save');
+    }
+  } catch (e) {
+    showInlineError('location', 'Network error');
+  }
+  if (btn) btn.disabled = false;
+}
+
+function applyResumeMode(data) {
+  const el = document.getElementById('resume-mode-display');
+  if (!el) return;
+  const mode = data.mode || 'sample';
+  if (mode === 'sample') {
+    const name = (data.sample_resume || {}).name || 'Sample Resume';
+    el.textContent = 'Sample (' + name + ')';
+  } else {
+    const name = (data.user_resume || {}).name || 'My Resume';
+    el.textContent = 'My Resume (' + name + ')';
+  }
+}
+
+function applySettings(data) {
+  const auto = data.automation || {};
+  for (const task of ['scrape', 'generate']) {
+    const taskData = auto[task] || {};
+    const mode = taskData.mode || 'manual';
+    const schedule = taskData.schedule || (task === 'scrape' ? '09:00' : '10:00');
+    renderMode(task, mode);
+    const schedInput = document.getElementById('sched-' + task);
+    if (schedInput) schedInput.value = schedule;
+  }
+}
+
+function renderMode(task, mode) {
+  // Toggle buttons
+  const manualBtn = document.querySelector(`[data-task="${task}"][data-mode="manual"]`);
+  const autoBtn   = document.querySelector(`[data-task="${task}"][data-mode="automatic"]`);
+  if (manualBtn && autoBtn) {
+    manualBtn.classList.toggle('active', mode === 'manual');
+    autoBtn.classList.toggle('active',   mode === 'automatic');
+  }
+  // Schedule row
+  const schedRow = document.getElementById('schedule-row-' + task);
+  if (schedRow) schedRow.style.display = mode === 'automatic' ? 'flex' : 'none';
+  // Status text + dot
+  const dot    = document.getElementById('dot-' + task);
+  const status = document.getElementById('status-' + task);
+  if (mode === 'automatic') {
+    dot.className    = 'settings-status-dot settings-dot-auto';
+    status.textContent = 'Running on schedule';
+  } else {
+    dot.className    = 'settings-status-dot settings-dot-manual';
+    status.textContent = 'Running manually';
+  }
+}
+
+async function setMode(task, mode) {
+  try {
+    const res = await fetch('/api/settings/automation/' + task, {
+      method:  'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ mode }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showInlineError(task, err.error || 'Error saving');
+      return;
+    }
+    renderMode(task, mode);
+    showFlash('flash-' + task);
+    // Update footer
+    document.getElementById('settings-footer').textContent = 'Last updated: just now';
+  } catch (e) {
+    showInlineError(task, 'Network error');
+  }
+}
+
+async function setSchedule(task, value) {
+  // Basic HH:MM client-side check
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    showInlineError(task, 'Invalid time format — use HH:MM');
+    return;
+  }
+  try {
+    const res = await fetch('/api/settings/automation/' + task, {
+      method:  'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ schedule: value }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showInlineError(task, err.error || 'Error saving');
+      return;
+    }
+    showFlash('flash-' + task + '-sched');
+  } catch (e) {
+    showInlineError(task, 'Network error');
+  }
+}
+
+function showFlash(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'inline';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+function showInlineError(task, msg) {
+  const statusEl = document.getElementById('status-' + task);
+  if (!statusEl) return;
+  const orig = statusEl.textContent;
+  statusEl.style.color = 'var(--danger)';
+  statusEl.textContent = '⚠ ' + msg;
+  setTimeout(() => {
+    statusEl.style.color = '';
+    statusEl.textContent = orig;
+  }, 3000);
+}
+
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 5)    return 'just now';
+  if (secs < 60)   return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + ' min ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + ' hr ago';
+  return Math.floor(secs / 86400) + ' days ago';
+}
+
+document.addEventListener('DOMContentLoaded', loadSettings);
+</script>
+{% endblock %}

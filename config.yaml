@@ -1,0 +1,109 @@
+# ============================================================
+# Resume Auto-Tailor  –  Application Configuration
+# ============================================================
+#
+# All scheduler settings live under the `scheduler:` key.
+# Edit this file to change scrape timing, search queries, and
+# notification preferences without touching any Python code.
+#
+# TEST MODE
+# ---------
+# Set  test_mode: true  to use short intervals so you can
+# verify the scheduler works without waiting hours:
+#   - scrape_jobs:       every 5 minutes  (instead of daily)
+#   - analyze_jobs:      every 2 minutes  (instead of every 2 h)
+#   - generate_resumes:  every 3 minutes  (instead of daily)
+#   - cleanup:           every 10 minutes (instead of weekly)
+#
+# PRODUCTION
+# ----------
+# Set  test_mode: false  to revert to the cron-based schedule.
+# ============================================================
+
+scheduler:
+
+  # ---- Mode -------------------------------------------------------
+  test_mode: false          # true = short intervals for quick testing
+
+  # ---- Daily scrape time (HH:MM, 24-hour, local timezone) --------
+  scrape_time: "09:00"          # DEPRECATED — scraping is now manual via dashboard
+
+  # ---- Task classification -------------------------------------------
+  # Manual tasks are triggered from the web dashboard Pipeline Controls.
+  # They are NOT registered with APScheduler.
+  manual_tasks:
+    - scrape_jobs_task
+    - analyze_new_jobs_task
+    - generate_resumes_task
+
+  # Automatic tasks run on a cron/interval schedule via APScheduler.
+  auto_tasks:
+    - cleanup_old_jobs_task
+    - daily_report_task
+
+  # ---- Auto-resume generation ------------------------------------
+  # Tailored resumes are generated automatically only for jobs whose
+  # pre-tailor match score meets or exceeds this threshold (0–100).
+  auto_generate_threshold: 35.0
+
+  # ---- Cleanup ---------------------------------------------------
+  # Jobs older than this many days (and not "applied") are archived.
+  cleanup_days: 30
+
+  # ---- Search configurations ------------------------------------
+  # DEPRECATED — search configs now managed via settings.json and the Resumes page UI.
+  # These entries are kept for reference only and are no longer read by the scheduler.
+  # Each entry is a separate scraping run.
+  # Only "linkedin" source is used (Indeed returns HTTP 403).
+  search_configs:
+    - keywords: "python developer"
+      location: "San Francisco"
+      source: "linkedin"
+      max_results: 20
+
+    - keywords: "machine learning engineer"
+      location: "Remote"
+      source: "linkedin"
+      max_results: 15
+
+    - keywords: "software engineer"
+      location: "San Francisco"
+      source: "linkedin"
+      max_results: 15
+
+  # ---- Notification preferences ----------------------------------
+  notifications:
+
+    # Console notifications are always shown in logs.
+    console: true
+
+    # Email notifications require SMTP credentials in .env
+    # Set EMAIL_NOTIFICATIONS_ENABLED=true in .env to activate.
+    email: false
+
+    # Only notify for jobs above this match score
+    notify_threshold: 50.0
+
+# ============================================================
+# AI / Gemini settings
+# ============================================================
+ai:
+  provider: gemini
+
+  # Primary model: complex tasks (professional summary rewrite)
+  # Free tier: 10 RPM / 250 RPD
+  primary_model: gemini-2.5-flash
+
+  # Bulk model: high-volume tasks (individual bullet rewrites)
+  # Free tier: 15 RPM / 1 000 RPD
+  bulk_model: gemini-2.5-flash-lite
+
+  api_key: ${GEMINI_API_KEY}
+  max_tokens: 1000
+  temperature: 0.7
+
+  primary_rate_limit_rpm: 10
+  bulk_rate_limit_rpm: 15
+
+  retry_attempts: 3
+  retry_delay: 2

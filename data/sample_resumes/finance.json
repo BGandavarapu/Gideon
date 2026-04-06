@@ -1,0 +1,78 @@
+{
+  "personal_info": {
+    "name": "Ryan Patel",
+    "email": "ryan.patel@email.com",
+    "phone": "(212) 555-0967",
+    "location": "New York, NY",
+    "linkedin": "linkedin.com/in/ryanpatel-finance"
+  },
+  "professional_summary": "Financial analyst and FP&A professional with 5 years of experience in corporate finance, financial modeling, and investment analysis at Fortune 500 companies and growth-stage startups. Expert in DCF valuation, budgeting, and forecasting with advanced Excel and SQL skills. Proven ability to deliver financial insights that drive strategic decision-making.",
+  "work_experience": [
+    {
+      "title": "Senior Financial Analyst – FP&A",
+      "company": "Meridian Capital Partners",
+      "location": "New York, NY",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Built 3-statement financial models and DCF valuation models for $50M+ M&A due diligence transactions",
+        "Led annual budgeting and quarterly forecasting process for $200M P&L, improving forecast accuracy by 18%",
+        "Performed variance analysis on monthly actuals vs. budget, presenting findings to CFO and executive team",
+        "Developed Tableau dashboards and Excel-based FP&A reporting tools used by 25+ finance team members",
+        "Streamlined financial reporting process using SQL queries and Python automation, saving 15 hours per month"
+      ]
+    },
+    {
+      "title": "Financial Analyst",
+      "company": "Apex Growth Corp",
+      "location": "New York, NY",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Supported LBO and leveraged buyout financial modeling for private equity transactions totaling $800M",
+        "Prepared investment analysis presentations using Bloomberg and Capital IQ for senior management review",
+        "Maintained and updated complex financial models in Excel with VBA macros for scenario analysis",
+        "Assisted in preparation of quarterly board materials including financial forecasting and treasury reporting"
+      ]
+    },
+    {
+      "title": "Associate Financial Analyst",
+      "company": "Brightstone Advisory",
+      "location": "Chicago, IL",
+      "dates": "2019 – 2020",
+      "bullets": [
+        "Conducted financial analysis and valuation for 8 portfolio companies using DCF and comparable company analysis",
+        "Built GAAP-compliant financial statements in Excel for audit preparation, achieving zero restatements",
+        "Performed market research and competitive benchmarking using FactSet and Bloomberg Terminal",
+        "Supported accounting team with month-end close procedures and IFRS financial statement preparation"
+      ]
+    }
+  ],
+  "skills": [
+    "Financial Modeling", "DCF", "Excel", "SQL", "Tableau",
+    "FP&A", "Budgeting", "Forecasting", "GAAP", "Bloomberg",
+    "PowerPoint", "Variance Analysis", "P&L Management",
+    "LBO", "Capital IQ", "FactSet", "IFRS", "Python"
+  ],
+  "education": [
+    {
+      "degree": "M.B.A. Finance",
+      "institution": "NYU Stern School of Business",
+      "year": "2019"
+    },
+    {
+      "degree": "B.S. Accounting",
+      "institution": "University of Illinois Urbana-Champaign",
+      "year": "2017"
+    }
+  ],
+  "certifications": [
+    "CFA Level II Candidate",
+    "Financial Modeling and Valuation Analyst (FMVA)"
+  ],
+  "projects": [
+    {
+      "name": "FinancialModels.io",
+      "description": "Free library of Excel-based DCF, LBO, and M&A financial models downloaded 8,000+ times",
+      "technologies": ["Excel", "VBA", "Google Sheets"]
+    }
+  ]
+}

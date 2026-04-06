@@ -1,0 +1,74 @@
+{
+  "personal_info": {
+    "name": "Sofia Martinez",
+    "email": "sofia.martinez@email.com",
+    "phone": "(512) 555-0614",
+    "location": "Austin, TX",
+    "linkedin": "linkedin.com/in/sofiamartinez-growth"
+  },
+  "professional_summary": "Digital marketing and growth professional with 6 years of experience driving demand generation, SEO, and paid acquisition for B2B SaaS companies. Proven track record of scaling pipeline through content marketing, email campaigns, and performance marketing with measurable ROI using Google Analytics, HubSpot, and Marketo.",
+  "work_experience": [
+    {
+      "title": "Senior Growth Marketing Manager",
+      "company": "Leapfrog SaaS",
+      "location": "Austin, TX",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Led demand generation strategy generating $4.2M in qualified pipeline through integrated SEO, SEM, and email marketing campaigns",
+        "Managed $800K annual Google Ads and Facebook Ads budget, achieving 3.2x ROAS through continuous A/B testing and CRO",
+        "Built HubSpot marketing automation workflows reducing lead response time from 4 hours to 12 minutes, increasing conversion rate by 28%",
+        "Grew organic traffic by 180% in 18 months through content marketing strategy and technical SEO improvements",
+        "Launched 6 product campaigns from go-to-market planning through execution, each achieving target MQL goals"
+      ]
+    },
+    {
+      "title": "Digital Marketing Manager",
+      "company": "Springboard Analytics",
+      "location": "Denver, CO",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Managed end-to-end email marketing program with Marketo and Mailchimp serving 120,000+ subscriber list",
+        "Implemented attribution modeling in Google Analytics reducing wasted ad spend by $200K annually",
+        "Executed inbound marketing strategy with Salesforce integration, increasing MQL-to-SQL conversion by 35%",
+        "Created and optimized Google Tag Manager tracking setup for complete marketing funnel visibility"
+      ]
+    },
+    {
+      "title": "Marketing Coordinator",
+      "company": "BlueSky Media",
+      "location": "Austin, TX",
+      "dates": "2018 – 2020",
+      "bullets": [
+        "Managed social media management across LinkedIn, Twitter, and Instagram growing combined following by 45%",
+        "Wrote copywriting for landing pages, case studies, and blog content achieving average 4.2% conversion rate",
+        "Ran competitive analysis and market research reports used by executive team for quarterly strategy planning",
+        "Supported demand generation campaigns using HubSpot, driving 500+ monthly leads through paid social and PPC"
+      ]
+    }
+  ],
+  "skills": [
+    "SEO", "SEM", "Google Ads", "HubSpot", "Marketo", "Google Analytics",
+    "Content Strategy", "Email Marketing", "A/B Testing", "Salesforce",
+    "Social Media", "Copywriting", "Demand Generation", "CRO",
+    "Facebook Ads", "Google Tag Manager", "Mixpanel", "Klaviyo"
+  ],
+  "education": [
+    {
+      "degree": "B.A. Marketing",
+      "institution": "University of Texas at Austin",
+      "year": "2018"
+    }
+  ],
+  "certifications": [
+    "Google Ads Certified",
+    "HubSpot Marketing Software Certification",
+    "Google Analytics Individual Qualification"
+  ],
+  "projects": [
+    {
+      "name": "GrowthPlaybook.co",
+      "description": "Community resource for B2B growth marketers with 2,000+ members sharing campaign templates and benchmarks",
+      "technologies": ["WordPress", "Mailchimp", "Slack"]
+    }
+  ]
+}

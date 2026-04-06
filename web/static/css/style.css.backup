@@ -1,0 +1,45 @@
+
+/* ── Resume mismatch card ─────────────────────────────────────────── */
+.mismatch-card {
+  background: var(--yellow-bg);
+  border: 1px solid rgba(245, 166, 35, 0.30);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+.mismatch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.mismatch-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.mismatch-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn-warning {
+  background: var(--yellow-bg);
+  color: var(--yellow);
+  border: 1px solid rgba(245, 166, 35, 0.30);
+}
+.btn-warning:hover:not(:disabled) {
+  background: rgba(245, 166, 35, 0.20);
+}
+.analyzed-badge {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.analyzed-badge strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}

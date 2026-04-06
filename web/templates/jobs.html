@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Gideon{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Jobs</h1>
+    <p class="page-subtitle" id="jobs-count-text">Loading…</p>
+  </div>
+  <div class="header-actions">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+      </svg>
+      <input id="search-input" type="text" class="search-input" placeholder="Search title or company…" autocomplete="off">
+    </div>
+    <select id="status-filter" class="filter-select">
+      <option value="">All status</option>
+      <option value="new">New</option>
+      <option value="analyzed">Analyzed</option>
+      <option value="applied">Applied</option>
+      <option value="archived">Archived</option>
+    </select>
+    <button class="btn btn-primary" onclick="runTask('scrape')">
+      + Scrape
+    </button>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="table-card">
+  <table class="data-table" id="jobs-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Location</th>
+        <th>Skills</th>
+        <th>Match</th>
+        <th>Status</th>
+        <th>Scraped</th>
+      </tr>
+    </thead>
+    <tbody id="jobs-tbody">
+      <tr><td colspan="7" class="td-loading">
+        <span class="loading-dots">Loading jobs<span>.</span><span>.</span><span>.</span></span>
+      </td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="pagination" id="jobs-pagination"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    loadJobs();
+    setupJobFilters();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,74 @@
+{
+  "personal_info": {
+    "name": "Aisha Okafor",
+    "email": "aisha.okafor@email.com",
+    "phone": "(917) 555-0852",
+    "location": "Brooklyn, NY",
+    "linkedin": "linkedin.com/in/aishaokafor-design",
+    "portfolio": "aishaokafor.design"
+  },
+  "professional_summary": "Product and UX designer with 6 years of experience crafting intuitive digital experiences for mobile and web applications. Skilled at leading end-to-end design processes from user research and wireframing through high-fidelity prototyping and design systems. Passionate about accessibility and inclusive design.",
+  "work_experience": [
+    {
+      "title": "Senior Product Designer",
+      "company": "Horizon Apps",
+      "location": "New York, NY",
+      "dates": "2022 – Present",
+      "bullets": [
+        "Led UX design for core mobile application serving 2M+ users, achieving 4.7 App Store rating after redesign",
+        "Built and maintained comprehensive design systems in Figma used by 15-person design and engineering team",
+        "Conducted 50+ user research sessions and usability testing studies informing 3 major product redesigns",
+        "Improved onboarding completion rate by 44% through interaction design and information architecture improvements",
+        "Championed accessibility initiatives achieving WCAG 2.1 AA compliance across all product surfaces"
+      ]
+    },
+    {
+      "title": "UX Designer",
+      "company": "Clearpath Digital",
+      "location": "San Francisco, CA",
+      "dates": "2020 – 2022",
+      "bullets": [
+        "Created wireframes, prototypes, and visual design for B2B SaaS dashboard serving enterprise customers",
+        "Ran design sprints using Design Thinking methodology, validating concepts with users before engineering investment",
+        "Designed responsive design components for web and mobile using Figma and Adobe XD",
+        "Collaborated with engineering team in Zeplin to ensure pixel-perfect implementation of design specifications"
+      ]
+    },
+    {
+      "title": "UI/UX Designer",
+      "company": "Studio Nuance",
+      "location": "Brooklyn, NY",
+      "dates": "2018 – 2020",
+      "bullets": [
+        "Designed UI for 12 client projects across e-commerce, fintech, and healthcare verticals",
+        "Created visual design systems and brand style guides using Sketch and Illustrator",
+        "Produced motion design animations and micro-interactions in After Effects and Principle",
+        "Worked with InVision to create interactive prototyping for client presentations and usability testing"
+      ]
+    }
+  ],
+  "skills": [
+    "Figma", "Sketch", "Adobe XD", "User Research", "Wireframing",
+    "Prototyping", "Design Systems", "Usability Testing", "Accessibility",
+    "Interaction Design", "Visual Design", "InVision",
+    "WCAG", "Responsive Design", "Motion Design", "After Effects", "Principle"
+  ],
+  "education": [
+    {
+      "degree": "B.F.A. Interaction Design",
+      "institution": "Parsons School of Design",
+      "year": "2018"
+    }
+  ],
+  "certifications": [
+    "Nielsen Norman Group UX Certification",
+    "Interaction Design Foundation – UX Design (2022)"
+  ],
+  "projects": [
+    {
+      "name": "DesignTokens.io",
+      "description": "Open design token library for Figma enabling cross-platform design consistency, used by 3,000+ designers",
+      "technologies": ["Figma", "Style Dictionary", "GitHub"]
+    }
+  ]
+}

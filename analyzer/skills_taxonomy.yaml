@@ -1,0 +1,655 @@
+# Resume Auto-Tailor – Skills Taxonomy
+# ---------------------------------------------------------------------------
+# Keys are canonical category names used throughout the analyser.
+# Values are lists of strings matched case-insensitively against job text.
+# Longer / more-specific phrases should appear BEFORE shorter ones so the
+# matcher can prefer precise hits (e.g. "machine learning" before "ml").
+# ---------------------------------------------------------------------------
+
+programming_languages:
+  - python
+  - java
+  - javascript
+  - typescript
+  - c++
+  - c#
+  - c
+  - go
+  - golang
+  - rust
+  - ruby
+  - php
+  - swift
+  - kotlin
+  - scala
+  - r
+  - matlab
+  - perl
+  - haskell
+  - elixir
+  - dart
+  - lua
+  - julia
+  - groovy
+  - shell
+  - bash
+  - powershell
+
+web_frameworks:
+  - django
+  - flask
+  - fastapi
+  - pyramid
+  - tornado
+  - react
+  - reactjs
+  - react.js
+  - angular
+  - angularjs
+  - vue
+  - vue.js
+  - vuejs
+  - next.js
+  - nextjs
+  - nuxt.js
+  - svelte
+  - express
+  - express.js
+  - node.js
+  - nodejs
+  - rails
+  - ruby on rails
+  - spring
+  - spring boot
+  - asp.net
+  - laravel
+  - symfony
+  - fastify
+
+data_science_ml:
+  - machine learning
+  - deep learning
+  - neural network
+  - natural language processing
+  - nlp
+  - computer vision
+  - reinforcement learning
+  - tensorflow
+  - pytorch
+  - keras
+  - scikit-learn
+  - sklearn
+  - pandas
+  - numpy
+  - scipy
+  - matplotlib
+  - seaborn
+  - plotly
+  - xgboost
+  - lightgbm
+  - catboost
+  - hugging face
+  - transformers
+  - llm
+  - large language model
+  - generative ai
+  - mlops
+  - feature engineering
+  - model deployment
+  - a/b testing
+  - statistical modeling
+  - time series
+  - regression
+  - classification
+  - clustering
+
+databases:
+  - sql
+  - postgresql
+  - postgres
+  - mysql
+  - mariadb
+  - sqlite
+  - oracle
+  - sql server
+  - microsoft sql server
+  - mssql
+  - mongodb
+  - dynamodb
+  - cassandra
+  - redis
+  - elasticsearch
+  - opensearch
+  - neo4j
+  - couchdb
+  - firestore
+  - supabase
+  - snowflake
+  - bigquery
+  - redshift
+  - databricks
+  - delta lake
+  - hive
+  - hbase
+
+cloud_platforms:
+  - amazon web services
+  - aws
+  - microsoft azure
+  - azure
+  - google cloud platform
+  - google cloud
+  - gcp
+  - cloud
+  - heroku
+  - digitalocean
+  - cloudflare
+  - vercel
+  - netlify
+  - linode
+  - vultr
+
+cloud_services:
+  - ec2
+  - s3
+  - lambda
+  - rds
+  - ecs
+  - eks
+  - sqs
+  - sns
+  - cloudformation
+  - cloudwatch
+  - iam
+  - vpc
+  - route 53
+  - api gateway
+  - azure devops
+  - azure functions
+  - azure blob storage
+  - cloud functions
+  - cloud run
+  - pubsub
+
+devops_cicd:
+  - devops
+  - ci/cd
+  - continuous integration
+  - continuous deployment
+  - continuous delivery
+  - docker
+  - kubernetes
+  - k8s
+  - helm
+  - terraform
+  - ansible
+  - puppet
+  - chef
+  - jenkins
+  - github actions
+  - gitlab ci
+  - circleci
+  - travis ci
+  - argocd
+  - spinnaker
+  - prometheus
+  - grafana
+  - datadog
+  - new relic
+  - splunk
+  - elk stack
+  - logstash
+  - kibana
+  - istio
+  - nginx
+  - apache
+  - load balancer
+  - infrastructure as code
+
+version_control:
+  - git
+  - github
+  - gitlab
+  - bitbucket
+  - svn
+  - mercurial
+
+testing:
+  - unit testing
+  - integration testing
+  - end-to-end testing
+  - e2e testing
+  - tdd
+  - test driven development
+  - bdd
+  - behavior driven development
+  - pytest
+  - jest
+  - mocha
+  - junit
+  - selenium
+  - cypress
+  - playwright
+  - postman
+  - load testing
+  - performance testing
+  - qa
+
+security:
+  - cybersecurity
+  - information security
+  - penetration testing
+  - soc 2
+  - pci dss
+  - gdpr
+  - hipaa
+  - owasp
+  - oauth
+  - jwt
+  - ssl/tls
+  - ssl
+  - tls
+  - zero trust
+  - iam
+  - siem
+  - vulnerability assessment
+
+methodologies:
+  - agile
+  - scrum
+  - kanban
+  - waterfall
+  - lean
+  - devops
+  - devsecops
+  - sprint
+  - jira
+  - confluence
+  - trello
+  - asana
+  - product management
+  - project management
+  - okr
+  - kpi
+
+api_and_architecture:
+  - rest
+  - restful
+  - rest api
+  - graphql
+  - grpc
+  - soap
+  - websocket
+  - microservices
+  - microservice
+  - monolith
+  - serverless
+  - event-driven
+  - event driven
+  - message queue
+  - rabbitmq
+  - kafka
+  - apache kafka
+  - nats
+  - api design
+  - openapi
+  - swagger
+
+data_engineering:
+  - data pipeline
+  - etl
+  - elt
+  - apache spark
+  - spark
+  - apache flink
+  - flink
+  - airflow
+  - apache airflow
+  - dbt
+  - data warehouse
+  - data lake
+  - data lakehouse
+  - data modeling
+  - data governance
+  - data quality
+  - stream processing
+  - batch processing
+  - kafka
+  - kinesis
+  - glue
+  - nifi
+
+mobile:
+  - ios
+  - android
+  - react native
+  - flutter
+  - xamarin
+  - swift
+  - kotlin
+  - mobile development
+  - pwa
+  - progressive web app
+
+design_and_ux:
+  - figma
+  - sketch
+  - adobe xd
+  - invision
+  - ux design
+  - ui design
+  - user experience
+  - user interface
+  - wireframing
+  - prototyping
+  - accessibility
+  - wcag
+  - responsive design
+
+soft_skills:
+  - leadership
+  - communication
+  - teamwork
+  - collaboration
+  - problem solving
+  - problem-solving
+  - analytical thinking
+  - critical thinking
+  - attention to detail
+  - time management
+  - adaptability
+  - mentoring
+  - mentorship
+  - coaching
+  - presentation skills
+  - stakeholder management
+  - cross-functional
+  - self-motivated
+  - initiative
+  - ownership
+  - accountability
+  - empathy
+  - creativity
+  - innovation
+  - negotiation
+  - conflict resolution
+  - decision making
+  - strategic thinking
+  - interpersonal skills
+
+certifications:
+  - aws certified solutions architect
+  - aws solutions architect
+  - aws certified developer
+  - aws certified sysops
+  - aws cloud practitioner
+  - google cloud professional
+  - gcp professional
+  - azure solutions architect
+  - azure developer
+  - certified kubernetes administrator
+  - cka
+  - ckad
+  - pmp
+  - project management professional
+  - cissp
+  - ceh
+  - comptia security+
+  - comptia a+
+  - comptia network+
+  - certified scrum master
+  - csm
+  - safe
+  - itil
+  - six sigma
+  - data science certification
+
+education_keywords:
+  - bachelor
+  - bachelor's
+  - bs
+  - b.s.
+  - master
+  - master's
+  - ms
+  - m.s.
+  - mba
+  - phd
+  - ph.d.
+  - doctorate
+  - computer science
+  - software engineering
+  - information technology
+  - electrical engineering
+  - mathematics
+  - statistics
+  - data science
+  - related field
+
+# ---------------------------------------------------------------------------
+# Multi-domain sections added for domain-aware analysis
+# ---------------------------------------------------------------------------
+
+product_management:
+  core:
+    - product roadmap
+    - product strategy
+    - go-to-market
+    - GTM
+    - user stories
+    - sprint planning
+    - backlog grooming
+    - OKRs
+    - KPIs
+    - A/B testing
+    - feature prioritization
+    - stakeholder management
+    - product lifecycle
+    - PRD
+    - product requirements
+  tools:
+    - Jira
+    - Confluence
+    - Asana
+    - Productboard
+    - Notion
+    - Figma
+    - Mixpanel
+    - Amplitude
+    - Tableau
+    - Looker
+  methodologies:
+    - Agile
+    - Scrum
+    - Kanban
+    - Lean
+    - Design Thinking
+
+marketing:
+  digital:
+    - SEO
+    - SEM
+    - Google Ads
+    - Facebook Ads
+    - paid social
+    - PPC
+    - content marketing
+    - email marketing
+    - marketing automation
+    - growth hacking
+    - conversion rate optimization
+    - CRO
+    - inbound marketing
+    - demand generation
+    - lead generation
+  analytics:
+    - Google Analytics
+    - Google Tag Manager
+    - Mixpanel
+    - HubSpot
+    - Marketo
+    - Salesforce Marketing Cloud
+    - Mailchimp
+    - Klaviyo
+    - campaign analytics
+    - attribution modeling
+  brand:
+    - brand strategy
+    - brand management
+    - copywriting
+    - content strategy
+    - social media management
+    - influencer marketing
+    - PR
+    - public relations
+    - market research
+    - competitive analysis
+
+data_analytics:
+  languages:
+    - SQL
+    - Python
+    - R
+    - Excel
+    - VBA
+  tools:
+    - Tableau
+    - Power BI
+    - Looker
+    - Metabase
+    - dbt
+    - Snowflake
+    - BigQuery
+    - Redshift
+    - Databricks
+    - Apache Spark
+  skills:
+    - data visualization
+    - statistical analysis
+    - A/B testing
+    - hypothesis testing
+    - regression analysis
+    - cohort analysis
+    - funnel analysis
+    - ETL
+    - data pipeline
+    - data modeling
+    - business intelligence
+    - BI
+    - dashboard
+
+design:
+  tools:
+    - Figma
+    - Sketch
+    - Adobe XD
+    - InVision
+    - Zeplin
+    - Framer
+    - Photoshop
+    - Illustrator
+    - After Effects
+    - Principle
+  skills:
+    - UX design
+    - UI design
+    - user research
+    - usability testing
+    - wireframing
+    - prototyping
+    - design systems
+    - interaction design
+    - visual design
+    - information architecture
+    - accessibility
+    - WCAG
+    - responsive design
+    - motion design
+
+finance:
+  skills:
+    - financial modeling
+    - financial analysis
+    - valuation
+    - DCF
+    - LBO
+    - M&A
+    - due diligence
+    - budgeting
+    - forecasting
+    - variance analysis
+    - P&L management
+    - GAAP
+    - IFRS
+    - accounting
+    - audit
+    - tax
+    - FP&A
+    - treasury
+  tools:
+    - Excel
+    - Bloomberg
+    - Capital IQ
+    - FactSet
+    - QuickBooks
+    - NetSuite
+    - SAP
+    - Oracle Financials
+    - Hyperion
+
+sales:
+  skills:
+    - B2B sales
+    - B2C sales
+    - SaaS sales
+    - enterprise sales
+    - account management
+    - business development
+    - cold calling
+    - prospecting
+    - pipeline management
+    - quota attainment
+    - contract negotiation
+    - solution selling
+    - consultative selling
+    - upselling
+    - cross-selling
+    - customer success
+    - CRM management
+  tools:
+    - Salesforce
+    - HubSpot CRM
+    - Outreach
+    - SalesLoft
+    - ZoomInfo
+    - LinkedIn Sales Navigator
+    - Gong
+    - Chorus
+
+operations:
+  skills:
+    - operations management
+    - process improvement
+    - supply chain
+    - logistics
+    - vendor management
+    - project management
+    - program management
+    - PMP
+    - Six Sigma
+    - Lean
+    - quality assurance
+    - QA
+    - SLA management
+    - workforce planning
+    - capacity planning
+  tools:
+    - Jira
+    - Asana
+    - Monday.com
+    - Notion
+    - Airtable
+    - ServiceNow
+    - Zendesk
+    - Slack
+    - Microsoft Teams

@@ -1,0 +1,78 @@
+{
+  "personal_info": {
+    "name": "Jordan Kim",
+    "email": "jordan.kim@email.com",
+    "phone": "(646) 555-0391",
+    "location": "New York, NY",
+    "linkedin": "linkedin.com/in/jordankim-pm"
+  },
+  "professional_summary": "Product manager with 7 years of experience leading B2B SaaS products from 0-to-1 and scaling to $50M+ ARR. Expert at translating customer insights into prioritized roadmaps, driving cross-functional alignment through OKRs, and delivering measurable outcomes through A/B testing and data-driven iteration.",
+  "work_experience": [
+    {
+      "title": "Senior Product Manager",
+      "company": "Stackline Software",
+      "location": "New York, NY",
+      "dates": "2021 – Present",
+      "bullets": [
+        "Owned end-to-end product roadmap for core analytics product serving 400+ enterprise customers, growing NPS from 32 to 61",
+        "Defined and tracked OKRs across 3 engineering squads, achieving 87% of quarterly goals for 6 consecutive quarters",
+        "Led go-to-market strategy for 2 major feature launches, driving 22% increase in annual contract value (ACV)",
+        "Ran 40+ A/B tests using Amplitude and Mixpanel, iterating on onboarding flow to improve activation rate by 31%",
+        "Wrote PRDs and user stories in Confluence and Jira, maintaining backlog of 300+ features with clear prioritization framework"
+      ]
+    },
+    {
+      "title": "Product Manager",
+      "company": "Loopline Technologies",
+      "location": "San Francisco, CA",
+      "dates": "2019 – 2021",
+      "bullets": [
+        "Launched 0-to-1 integration marketplace with 15 third-party connectors, contributing $3M in new ARR within 9 months",
+        "Conducted 80+ user research interviews to define personas and validate product hypothesis before development",
+        "Managed stakeholder management across engineering, design, sales, and customer success teams of 30+ people",
+        "Applied Design Thinking to redesign core workflow, reducing user task completion time by 45%"
+      ]
+    },
+    {
+      "title": "Associate Product Manager",
+      "company": "Brightwork SaaS",
+      "location": "Austin, TX",
+      "dates": "2017 – 2019",
+      "bullets": [
+        "Assisted in sprint planning and backlog grooming for Agile team of 8 engineers using Scrum methodology",
+        "Built SQL dashboards in Looker to track product KPIs and feature adoption across customer cohorts",
+        "Coordinated product lifecycle from ideation to launch for 5 features, each delivered on schedule",
+        "Created Figma wireframes and collaborated with design team to prototype new user flows"
+      ]
+    }
+  ],
+  "skills": [
+    "Product Roadmap", "OKRs", "A/B Testing", "Jira", "Figma",
+    "SQL", "Amplitude", "User Research", "Agile", "Stakeholder Management",
+    "Go-to-Market", "PRD Writing", "Mixpanel",
+    "Confluence", "Looker", "Design Thinking", "Scrum"
+  ],
+  "education": [
+    {
+      "degree": "MBA",
+      "institution": "Wharton School, University of Pennsylvania",
+      "year": "2017"
+    },
+    {
+      "degree": "B.S. Industrial Engineering",
+      "institution": "Georgia Tech",
+      "year": "2015"
+    }
+  ],
+  "certifications": [
+    "Certified Scrum Product Owner (CSPO)",
+    "Pragmatic Marketing Certified (PMC III)"
+  ],
+  "projects": [
+    {
+      "name": "ProductCompass Blog",
+      "description": "Weekly product management newsletter with 5,000+ subscribers covering roadmapping and prioritization frameworks",
+      "technologies": ["Substack", "Notion"]
+    }
+  ]
+}

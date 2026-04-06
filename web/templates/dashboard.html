@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Gideon{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Your job search pipeline at a glance</p>
+  </div>
+</div>
+
+<!-- ── Demo mode banner (shown when using sample resume) ──────── -->
+<!-- ── Active Context banner ───────────────────────────────── -->
+<div id="active-context-banner" class="active-context-banner">
+  <div class="active-context-left">
+    <span class="active-context-icon">🎯</span>
+    <div class="active-context-text">
+      <span id="active-context-resume" class="active-context-resume">Loading…</span>
+      <span id="active-context-scraping" class="active-context-scraping"></span>
+    </div>
+  </div>
+  <a href="{{ url_for('resumes_page') }}" class="active-context-link">Change Resume →</a>
+</div>
+
+<!-- ── Stat cards ─────────────────────────────────────────────── -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Jobs</div>
+    <div class="stat-value">{{ stats.total_jobs }}</div>
+    <div class="stat-sub">{{ stats.new_jobs }} new</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Analyzed</div>
+    <div class="stat-value">{{ stats.analyzed_jobs }}</div>
+    <div class="stat-sub">keywords extracted</div>
+  </div>
+  <div class="stat-card accent">
+    <div class="stat-label">Tailored Resumes</div>
+    <div class="stat-value">{{ stats.total_resumes }}</div>
+    <div class="stat-sub">AI-generated</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Applications</div>
+    <div class="stat-value">{{ stats.total_apps }}</div>
+    <div class="stat-sub">{{ stats.applied_jobs }} jobs applied</div>
+  </div>
+</div>
+
+<!-- ── Pipeline Controls ─────────────────────────────────────── -->
+<div class="pipeline-card" id="pipeline-controls">
+  <div class="pipeline-header">
+    <h2 class="section-title">Pipeline Controls</h2>
+    <span class="pipeline-hint">Click a button to run a task · <a href="{{ url_for('settings_page') }}" class="pipeline-settings-link">Manage schedule →</a></span>
+  </div>
+  <div class="pipeline-buttons">
+
+    <!-- Scrape Jobs -->
+    <div class="pipeline-step">
+      <button class="pipeline-btn" id="btn-scrape" onclick="triggerTask('scrape')"
+              title="Click to scrape jobs">
+        <span class="pipeline-btn-icon">🔍</span>
+        <span class="pipeline-btn-label">Scrape Jobs</span>
+        <span class="pipeline-auto-badge" id="badge-scrape" style="display:none">Auto ⚡</span>
+        <span class="pipeline-spinner" id="spin-scrape" style="display:none">⟳</span>
+      </button>
+      <div class="pipeline-meta">
+        <span class="pipeline-last" id="last-scrape">Last run: —</span>
+        <span class="pipeline-subtitle" id="scrape-subtitle" style="font-size:11px;color:var(--text-secondary);display:block;margin-top:2px"></span>
+      </div>
+    </div>
+
+    <div class="pipeline-arrow">→</div>
+
+    <!-- Analyze Jobs -->
+    <div class="pipeline-step">
+      <button class="pipeline-btn" id="btn-analyze" onclick="triggerTask('analyze')"
+              title="Click to analyze jobs">
+        <span class="pipeline-btn-icon">🧠</span>
+        <span class="pipeline-btn-label">Analyze Jobs</span>
+        <span class="pipeline-spinner" id="spin-analyze" style="display:none">⟳</span>
+      </button>
+      <div class="pipeline-meta">
+        <span class="pipeline-last" id="last-analyze">Last run: —</span>
+      </div>
+    </div>
+
+    <div class="pipeline-arrow">→</div>
+
+    <!-- Generate Resumes -->
+    <div class="pipeline-step">
+      <button class="pipeline-btn" id="btn-generate" onclick="triggerTask('generate')"
+              title="Click to generate resumes">
+        <span class="pipeline-btn-icon">📄</span>
+        <span class="pipeline-btn-label">Generate Resumes</span>
+        <span class="pipeline-auto-badge" id="badge-generate" style="display:none">Auto ⚡</span>
+        <span class="pipeline-spinner" id="spin-generate" style="display:none">⟳</span>
+      </button>
+      <div class="pipeline-meta">
+        <span class="pipeline-last" id="last-generate">Last run: —</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Re-analyze All Jobs ───────────────────────────────────── -->
+<div style="margin-top:8px;padding:10px 16px;background:var(--bg-secondary);border-radius:8px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-secondary)">
+  <span>Stale scores or bad skill data?</span>
+  <button id="btn-reanalyze-all"
+          onclick="reanalyzeAllJobs()"
+          style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-primary)">
+    Re-analyze All Jobs
+  </button>
+  <span id="reanalyze-all-status" style="font-size:12px;color:var(--text-secondary)"></span>
+</div>
+
+<!-- ── Toast notification ─────────────────────────────────────── -->
+<div id="pipeline-toast" class="pipeline-toast" style="display:none"></div>
+
+<script>
+// ── Pipeline Controls JS ────────────────────────────────────────
+
+const TASK_KEYS = ['scrape', 'analyze', 'generate'];
+const TOGGLEABLE = ['scrape', 'generate'];
+let _pollInterval = null;
+let _settingsRefreshInterval = null;
+
+async function triggerTask(key) {
+  const btn = document.getElementById('btn-' + key);
+  if (!btn) {
+    console.error('triggerTask: missing button for', key);
+    return;
+  }
+  if (btn.disabled) return;
+
+  const labelEl = btn.querySelector('.pipeline-btn-label');
+  const label = labelEl ? labelEl.textContent : key;
+
+  try {
+    const res = await fetch('/api/run/' + key, { method: 'POST' });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) {
+      showToast('Server returned a non-JSON response (' + res.status + '). Check that the app is running on port 5001.', 'error');
+      return;
+    }
+    if (!res.ok) {
+      if (res.status === 409) {
+        showToast(data.error || 'Already running — tracking progress…', 'info');
+        startPolling();
+        return;
+      }
+      showToast(data.error || ('Request failed (' + res.status + '): ' + (data.status || 'unknown')), 'error');
+      return;
+    }
+    if (data.status === 'started') {
+      showToast('⏳ ' + label + ' started…', 'info');
+      startPolling();
+      return;
+    }
+    showToast('Unexpected server response: ' + JSON.stringify(data), 'error');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    let extra = '';
+    if (/Failed to fetch|NetworkError|load failed|Network request failed/i.test(msg)) {
+      extra = ' Start the app from the project folder: .\\scripts\\start_app.ps1 or: python web/app.py';
+    }
+    showToast('Failed to start task: ' + msg + extra, 'error');
+  }
+}
+
+function startPolling() {
+  if (_pollInterval) return;
+  _pollInterval = setInterval(pollStatus, 3000);
+  pollStatus();
+}
+
+async function pollStatus() {
+  try {
+    const [statusRes, lastRunRes, statsRes] = await Promise.all([
+      fetch('/api/run/status'),
+      fetch('/api/run/last-run'),
+      fetch('/api/stats'),
+    ]);
+    const status  = await statusRes.json();
+    const lastRun = await lastRunRes.json();
+    const stats   = await statsRes.json();
+
+    let anyRunning = false;
+    for (const key of TASK_KEYS) {
+      const btn  = document.getElementById('btn-' + key);
+      const spin = document.getElementById('spin-' + key);
+      const lastEl = document.getElementById('last-' + key);
+      const running = status[key];
+
+      btn.disabled = running;
+      btn.classList.toggle('pipeline-btn-running', running);
+      spin.style.display = running ? 'inline' : 'none';
+
+      if (running) {
+        anyRunning = true;
+      } else if (lastRun[key]) {
+        const dt = new Date(lastRun[key] + 'Z');
+        lastEl.textContent = 'Last run: ' + timeAgo(dt);
+      }
+
+      // Mute analyze if no new jobs; mute generate if no analyzed jobs
+      if (key === 'analyze' && !running) {
+        btn.classList.toggle('pipeline-btn-muted', (stats.new_jobs || 0) === 0);
+      }
+      if (key === 'generate' && !running) {
+        btn.classList.toggle('pipeline-btn-muted', (stats.analyzed_jobs || 0) === 0);
+      }
+    }
+
+    if (!anyRunning && _pollInterval) {
+      clearInterval(_pollInterval);
+      _pollInterval = null;
+    }
+  } catch (_) {}
+}
+
+async function refreshAutoBadges() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    const auto = data.automation || {};
+    for (const key of TOGGLEABLE) {
+      const badge = document.getElementById('badge-' + key);
+      const btn   = document.getElementById('btn-' + key);
+      if (!badge) continue;
+      const mode = (auto[key] || {}).mode || 'manual';
+      const sched = (auto[key] || {}).schedule || '';
+      if (mode === 'automatic') {
+        badge.style.display = 'inline';
+        btn.title = 'Scheduled at ' + sched + ' · Click to run now';
+      } else {
+        badge.style.display = 'none';
+        btn.title = 'Click to ' + (key === 'scrape' ? 'scrape jobs' : 'generate resumes');
+      }
+    }
+  } catch (_) {}
+}
+
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 5)   return 'just now';
+  if (secs < 60)  return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + ' min ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + ' hr ago';
+  return Math.floor(secs / 86400) + ' days ago';
+}
+
+function showToast(msg, type) {
+  const toast = document.getElementById('pipeline-toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.className = 'pipeline-toast pipeline-toast-' + (type || 'info');
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
+
+// Initial status poll + settings badge load on page load
+document.addEventListener('DOMContentLoaded', () => {
+  pollStatus();
+  refreshAutoBadges();
+  checkDemoBanner();
+  // Refresh badges every 30 seconds to stay in sync with Settings page changes
+  _settingsRefreshInterval = setInterval(refreshAutoBadges, 30000);
+  setInterval(checkDemoBanner, 60000);
+});
+
+async function checkDemoBanner() {
+  try {
+    const res  = await fetch('/api/active-context');
+    const data = await res.json();
+    const resumeEl   = document.getElementById('active-context-resume');
+    const scrapingEl = document.getElementById('active-context-scraping');
+    const banner     = document.getElementById('active-context-banner');
+
+    if (!resumeEl || !banner) return;
+
+    const scrapeSubtitle = document.getElementById('scrape-subtitle');
+
+    if (data.active_resume) {
+      const r = data.active_resume;
+      const domainLabel = r.domain_display ? ` (${r.domain_display})` : '';
+      resumeEl.textContent = `Resume: ${r.name}${domainLabel}`;
+
+      const cfgs = data.industry_search_configs || [];
+      const userCfgs = data.user_search_configs || [];
+      const allCfgs = [...cfgs, ...userCfgs];
+      const allCfgLabels = allCfgs
+        .slice(0, 4)
+        .map(c => `"${c.keywords}"`)
+        .join(' · ');
+      const extraCount = allCfgs.length - 4;
+      const extraText = extraCount > 0 ? ` +${extraCount} more` : '';
+      if (scrapingEl) {
+        scrapingEl.textContent = allCfgLabels
+          ? `Scraping: ${allCfgLabels}${extraText}`
+          : 'No search configs active';
+      }
+      if (scrapeSubtitle) {
+        const domain = r.domain_display || '';
+        scrapeSubtitle.textContent = domain
+          ? `Will scrape ${allCfgs.length} config(s) for ${domain}`
+          : `${allCfgs.length} config(s) active`;
+      }
+      banner.className = 'active-context-banner' + (r.is_sample ? ' active-context-sample' : '');
+    } else {
+      resumeEl.textContent = '⚠️ No resume selected';
+      if (scrapingEl) scrapingEl.textContent = 'Select a resume to start scraping jobs.';
+      if (scrapeSubtitle) scrapeSubtitle.textContent = 'No active resume';
+      banner.className = 'active-context-banner active-context-warning';
+    }
+  } catch (_) {}
+}
+
+async function reanalyzeAllJobs() {
+  const btn = document.getElementById('btn-reanalyze-all');
+  const status = document.getElementById('reanalyze-all-status');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Resetting...';
+  status.textContent = '';
+  try {
+    const res = await fetch('/api/jobs/reanalyze-all', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      status.textContent = `Reset ${data.jobs_reset} jobs. Now click Analyze Jobs.`;
+      status.style.color = 'var(--green)';
+    } else {
+      status.textContent = data.error || 'Error';
+      status.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    status.textContent = 'Failed: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Re-analyze All Jobs';
+}
+</script>
+
+<!-- ── Two-column lower section ──────────────────────────────── -->
+<div class="dash-lower">
+
+  <!-- Recent jobs -->
+  <section class="dash-section">
+    <div class="section-header">
+      <h2 class="section-title">Recent Jobs</h2>
+      <a href="{{ url_for('jobs_page') }}" class="section-link">View all →</a>
+    </div>
+    <div class="mini-table-wrap">
+      <table class="mini-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Status</th>
+            <th>Scraped</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in recent_jobs %}
+          <tr class="clickable-row" onclick="openJobPanel({{ job.id }})">
+            <td class="td-title">{{ job.job_title }}</td>
+            <td class="td-secondary">{{ job.company_name }}</td>
+            <td><span class="badge badge-{{ job.status }}">{{ job.status }}</span></td>
+            <td class="td-secondary td-date">
+              {{ job.date_scraped.strftime('%b %d') if job.date_scraped else '—' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="td-empty">No jobs yet — run a scrape.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Top resumes -->
+  <section class="dash-section">
+    <div class="section-header">
+      <h2 class="section-title">Top Resumes</h2>
+      <a href="{{ url_for('resumes_page') }}" class="section-link">View all →</a>
+    </div>
+    <div class="resume-cards">
+      {% for r in top_resumes %}
+      <div class="resume-card" onclick="openResumePanel({{ r.id }})">
+        <div class="resume-card-header">
+          <span class="resume-job-title">
+            {{ r.job.job_title if r.job else '—' }}
+          </span>
+          <span class="match-chip {% if r.match_score and r.match_score >= 50 %}match-high{% elif r.match_score and r.match_score >= 35 %}match-mid{% else %}match-low{% endif %}">
+            {{ '%.0f%%' % r.match_score if r.match_score else 'N/A' }}
+          </span>
+        </div>
+        <div class="resume-card-sub">{{ r.job.company_name if r.job else '—' }}</div>
+        <div class="resume-card-footer">
+          <span>Generated {{ r.generated_at.strftime('%b %d') if r.generated_at else '—' }}</span>
+          {% if r.pdf_path %}<span class="pdf-chip">PDF ready</span>{% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state-sm">No tailored resumes yet.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+{% endblock %}

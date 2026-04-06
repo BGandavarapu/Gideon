@@ -1,0 +1,48 @@
+# Environment & secrets
+.env
+*.env
+data/gemini_usage.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Data & output (large binary files)
+data/jobs.db
+data/jobs.db-shm
+data/jobs.db-wal
+data/*.bak
+data/output/*.pdf
+data/uploads/
+data/settings.json
+data/_test_*.json
+logs/
+logs/*.log
+
+# Raw HTML debug dumps
+data/jobs/*.html
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

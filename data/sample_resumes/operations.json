@@ -1,0 +1,74 @@
+{
+  "personal_info": {
+    "name": "David Nakamura",
+    "email": "david.nakamura@email.com",
+    "phone": "(415) 555-1186",
+    "location": "San Francisco, CA",
+    "linkedin": "linkedin.com/in/davidnakamura-ops"
+  },
+  "professional_summary": "Operations and strategy professional with 7 years of experience optimizing business processes, managing cross-functional programs, and scaling operations for high-growth technology companies. Proven expertise in process improvement, vendor management, and data-driven operational decision-making using Six Sigma, Jira, and Tableau.",
+  "work_experience": [
+    {
+      "title": "Senior Operations Manager",
+      "company": "Vantage Growth Co.",
+      "location": "San Francisco, CA",
+      "dates": "2021 – Present",
+      "bullets": [
+        "Led operations management for 3 business units, overseeing $15M budget and team of 25 across supply chain and vendor management",
+        "Implemented Six Sigma process improvement initiatives reducing operational costs by $1.8M annually through waste elimination",
+        "Designed and managed project management workflows in Jira and Asana adopted by 80-person organization",
+        "Built Tableau operational dashboards providing real-time visibility into SLA management, capacity planning, and workforce planning",
+        "Negotiated vendor contracts with 12 partners achieving 18% cost reduction while maintaining quality metrics"
+      ]
+    },
+    {
+      "title": "Operations Program Manager",
+      "company": "Streamline Logistics",
+      "location": "Los Angeles, CA",
+      "dates": "2019 – 2021",
+      "bullets": [
+        "Managed end-to-end program management for $8M supply chain modernization initiative across 4 distribution centers",
+        "Applied Lean methodology to warehouse operations, reducing order processing time by 33% and error rate by 52%",
+        "Coordinated logistics manager workflows and stakeholder management across operations, finance, and technology teams",
+        "Tracked project portfolio using Monday.com and Notion, delivering 94% of milestones on time or ahead of schedule"
+      ]
+    },
+    {
+      "title": "Business Operations Analyst",
+      "company": "Momentum Technologies",
+      "location": "San Jose, CA",
+      "dates": "2017 – 2019",
+      "bullets": [
+        "Conducted data analysis using SQL and Python to identify operational bottlenecks reducing throughput by 25%",
+        "Created Tableau reporting suite for executive team tracking quality assurance and operational KPIs",
+        "Supported PMP-certified project manager on 3 concurrent technology implementation projects worth $5M total",
+        "Managed ServiceNow ticketing workflows and IT operations processes for 500-person organization"
+      ]
+    }
+  ],
+  "skills": [
+    "Operations Management", "Process Improvement", "SQL",
+    "Jira", "Asana", "Six Sigma", "Project Management", "Vendor Management",
+    "Stakeholder Management", "Data Analysis", "Tableau", "Notion",
+    "Supply Chain", "Lean", "PMP", "Monday.com", "Airtable", "Python"
+  ],
+  "education": [
+    {
+      "degree": "B.S. Industrial Engineering",
+      "institution": "University of California, San Diego",
+      "year": "2017"
+    }
+  ],
+  "certifications": [
+    "Project Management Professional (PMP)",
+    "Lean Six Sigma Green Belt",
+    "AWS Cloud Practitioner"
+  ],
+  "projects": [
+    {
+      "name": "OpsMetrics Dashboard",
+      "description": "Open-source Tableau operations analytics starter kit with pre-built KPI dashboards for supply chain and logistics teams",
+      "technologies": ["Tableau", "SQL", "Python", "GitHub"]
+    }
+  ]
+}

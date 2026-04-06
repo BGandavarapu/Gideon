@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Applications — Gideon{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Applications</h1>
+    <p class="page-subtitle">Track every job you've applied to</p>
+  </div>
+</div>
+
+<div class="empty-state">
+  <svg viewBox="0 0 64 64" fill="none" width="56" height="56">
+    <rect width="64" height="64" rx="16" fill="#2C2C2E"/>
+    <path d="M20 24h24M20 32h16M20 40h20" stroke="#5E6AD2" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <h3>No applications yet</h3>
+  <p>Generate a tailored resume for a job, then mark it as applied to track it here.</p>
+  <a href="{{ url_for('jobs_page') }}" class="btn btn-primary" style="display:inline-flex;margin-top:4px">
+    Browse Jobs
+  </a>
+</div>
+{% endblock %}

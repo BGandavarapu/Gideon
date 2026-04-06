@@ -1,0 +1,74 @@
+{
+  "personal_info": {
+    "name": "Emma Thompson",
+    "email": "emma.thompson@email.com",
+    "phone": "(646) 555-1073",
+    "location": "New York, NY",
+    "linkedin": "linkedin.com/in/emmathompson-sales"
+  },
+  "professional_summary": "Enterprise B2B SaaS sales professional with 6 years of experience closing complex deals with Fortune 500 accounts. Consistent quota attainment at 115%+ of target with average deal sizes of $200K+ ACV. Expert in consultative selling, pipeline management, and building long-term account relationships using Salesforce, Outreach, and Gong.",
+  "work_experience": [
+    {
+      "title": "Senior Account Executive – Enterprise",
+      "company": "Stratosphere SaaS",
+      "location": "New York, NY",
+      "dates": "2021 – Present",
+      "bullets": [
+        "Consistently exceeded quota at 118% attainment, closing $3.2M in new ARR in FY2024 with average $240K ACV deals",
+        "Managed full sales cycle from prospecting through contract negotiation and close for enterprise accounts 1,000+ employees",
+        "Built pipeline of $8M+ using LinkedIn Sales Navigator, Outreach sequences, and strategic account management",
+        "Leveraged Gong and Chorus conversation intelligence to refine solution selling approach, improving win rate by 22%",
+        "Partnered with customer success team to achieve 95% net revenue retention across 30-account portfolio"
+      ]
+    },
+    {
+      "title": "Account Executive – Mid-Market",
+      "company": "Loopback Technologies",
+      "location": "Boston, MA",
+      "dates": "2019 – 2021",
+      "bullets": [
+        "Exceeded annual quota by 125% in both years, generating $1.8M ARR through B2B sales to 50-500 employee companies",
+        "Maintained clean Salesforce CRM hygiene with 100% pipeline accuracy, used as model for 10-person sales team",
+        "Ran competitive displacement campaigns using consultative selling methodology, winning against 3 key competitors",
+        "Collaborated with BDR and SDR teams on outbound prospecting strategy, improving qualified pipeline by 40%"
+      ]
+    },
+    {
+      "title": "Business Development Representative",
+      "company": "Clearfield Software",
+      "location": "Austin, TX",
+      "dates": "2018 – 2019",
+      "bullets": [
+        "Generated 45+ qualified SQLs per quarter through cold calling, email outreach, and social selling via ZoomInfo",
+        "Managed HubSpot CRM sequence campaigns achieving 32% email open rate and 8% response rate",
+        "Promoted to AE role within 12 months — fastest promotion in team history",
+        "Exceeded BDR quota by 140% in first full year, contributing to $2.4M in sourced pipeline"
+      ]
+    }
+  ],
+  "skills": [
+    "B2B Sales", "Salesforce", "HubSpot CRM", "Outreach",
+    "Pipeline Management", "Account Management", "Contract Negotiation",
+    "Solution Selling", "LinkedIn Sales Navigator", "Gong", "Quota Attainment",
+    "SaaS Sales", "Enterprise Sales", "ZoomInfo", "Chorus", "SalesLoft"
+  ],
+  "education": [
+    {
+      "degree": "B.A. Communications",
+      "institution": "Boston University",
+      "year": "2018"
+    }
+  ],
+  "certifications": [
+    "Salesforce Certified Administrator",
+    "SPIN Selling Certified",
+    "Challenger Sale Training (2022)"
+  ],
+  "projects": [
+    {
+      "name": "SalesPlaybook Community",
+      "description": "Peer community for enterprise AEs sharing deal strategies, objection handling scripts, and comp benchmarking data",
+      "technologies": ["Slack", "Notion", "HubSpot"]
+    }
+  ]
+}
