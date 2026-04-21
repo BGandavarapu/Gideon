@@ -40,6 +40,10 @@ logs/*.log
 # Raw HTML debug dumps
 data/jobs/*.html
 
+# Project internals
+CLAUDE.md
+PROJECT_PLAN.md
+
 # IDE
 .vscode/
 .idea/

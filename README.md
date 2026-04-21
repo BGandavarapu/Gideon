@@ -86,4 +86,4 @@ Sessions persist to the database so you can resume a mock interview if you close
 
 ## License
 
-Private — all rights reserved.
+MIT
