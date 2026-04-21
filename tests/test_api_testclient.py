@@ -175,7 +175,7 @@ class TestManualAPIEndpoints(unittest.TestCase):
 
     # ── TEST 9: dashboard HTML ───────────────────────────────────────────────
     def test_9_dashboard_contains_pipeline_controls(self):
-        r = self.client.get("/")
+        r = self.client.get("/dashboard")
         self.assertEqual(r.status_code, 200)
         html = r.data.decode("utf-8", errors="replace")
         self.assertIn("Pipeline Controls", html, "Pipeline Controls section missing")

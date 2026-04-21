@@ -1,4 +1,4 @@
-# Resume Auto-Tailor — clean start script (Windows PowerShell)
+# Gideon — clean start script (Windows PowerShell)
 # Kills any process using port 5001 before starting Flask.
 # Usage: .\scripts\start_app.ps1
 #        PORT=5000 .\scripts\start_app.ps1   (if you need a different port)

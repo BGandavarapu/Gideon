@@ -103,7 +103,7 @@ class ExtractedKeyword:
         confidence: Float 0.0–1.0 indicating extraction confidence.
             Taxonomy hits always receive ``1.0``; NER hits receive ``0.7``.
         context: The sentence (or sentence fragment) in which the keyword
-            appeared, useful for downstream prompts to Gemini.
+            appeared, useful for downstream prompts to NIM.
         original_text: The raw un-normalised text as it appeared in the source.
     """
 

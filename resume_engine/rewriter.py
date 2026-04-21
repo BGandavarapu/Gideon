@@ -2,9 +2,9 @@
 NVIDIA NIM API wrapper for AI-powered resume content rewriting.
 
 Uses the ``openai`` SDK with the OpenAI-compatible NVIDIA NIM endpoint:
-    - **Model**: ``nvidia/llama-3.3-nemotron-super-49b-v1``
+    - **Model**: ``nvidia/llama-3.3-nemotron-super-49b-v1.5``
     - **Base URL**: ``https://integrate.api.nvidia.com/v1``
-    - **Quota**: tracked in ``data/gemini_usage.json`` under the ``"nvidia"`` key.
+    - **Quota**: tracked in ``data/nvidia_usage.json`` under the ``"nvidia"`` key.
 
 Key design decisions
 ---------------------
@@ -30,7 +30,7 @@ from resume_engine.rate_limiter import RateLimiter
 logger = logging.getLogger(__name__)
 
 # NVIDIA NIM — sole model for all rewriting tasks
-_NVIDIA_MODEL_ID = "nvidia/llama-3.3-nemotron-super-49b-v1"
+_NVIDIA_MODEL_ID = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
 _NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
 # Hard cap: truncate prompts at this many characters to stay within TPM limits
@@ -56,10 +56,10 @@ def _clean_response(text: str) -> str:
     return text.strip()
 
 
-class GeminiRewriter:
+class Rewriter:
     """AI-powered resume content rewriter using NVIDIA NIM (Nemotron).
 
-    Sends prompts to ``nvidia/llama-3.3-nemotron-super-49b-v1`` via the
+    Sends prompts to ``nvidia/llama-3.3-nemotron-super-49b-v1.5`` via the
     OpenAI-compatible NVIDIA NIM endpoint.
 
     Args:
@@ -84,7 +84,7 @@ class GeminiRewriter:
         if not nvidia_key:
             raise ValueError(
                 "NVIDIA_API_KEY not found. Set it in your .env file or pass "
-                "it explicitly to GeminiRewriter()."
+                "it explicitly to Rewriter()."
             )
 
         from openai import OpenAI as _OpenAI
@@ -106,7 +106,7 @@ class GeminiRewriter:
         self.api_call_count: int = 0
 
         logger.info(
-            "GeminiRewriter initialised — model=%s (%d RPM / %d RPD)",
+            "Rewriter initialised — model=%s (%d RPM / %d RPD)",
             _NVIDIA_MODEL_ID,
             self._nvidia_limiter.rpm,
             self._nvidia_limiter.rpd,
@@ -121,41 +121,56 @@ class GeminiRewriter:
         original_bullet: str,
         job_keywords: List[str],
         job_context: str,
+        job_description: str = "",
         style_fingerprint: Optional[dict] = None,
     ) -> str:
         """Rewrite a single resume bullet point to align with job requirements.
 
         Args:
             original_bullet: Original achievement text (one sentence).
-            job_keywords: Relevant keywords from the job description (top 5
+            job_keywords: Relevant keywords from the job description (top 5–8
                 are used to keep the prompt focused).
             job_context: Brief job context, e.g. ``"Senior Python Developer
                 at Acme Corp"``.
+            job_description: Excerpt from the job posting so the AI can
+                understand what the employer is looking for.
             style_fingerprint: Optional style fingerprint dict from
                 :class:`~resume_engine.style_extractor.StyleExtractor`.
                 When provided, voice, length, metric, and format
                 constraints are appended to the prompt as hard rules.
 
         Returns:
-            Rewritten bullet point string (15–20 words, ATS-friendly).
+            Rewritten bullet point string, ATS-friendly.
         """
         if not original_bullet or not original_bullet.strip():
             return original_bullet
 
-        kw_sample = ", ".join(job_keywords[:5]) if job_keywords else "general software engineering"
+        kw_sample = ", ".join(job_keywords[:8]) if job_keywords else "general software engineering"
+
+        # Build job requirements excerpt (first 500 chars of description)
+        jd_block = ""
+        if job_description:
+            jd_block = (
+                f"\nJOB REQUIREMENTS EXCERPT:\n{job_description[:500]}\n"
+            )
+
         prompt = (
-            "You are an expert resume writer. Rewrite the achievement below to better "
-            "match the job opportunity. Follow ALL rules strictly.\n\n"
+            "You are an expert resume writer customizing a resume for a specific job. "
+            "Rewrite the achievement below to align with what this employer is looking for. "
+            "Follow ALL rules strictly.\n\n"
             f"ORIGINAL ACHIEVEMENT:\n{original_bullet}\n\n"
-            f"JOB CONTEXT: {job_context}\n"
-            f"KEYWORDS TO INCORPORATE (2-3 naturally): {kw_sample}\n\n"
+            f"TARGET JOB: {job_context}\n"
+            f"{jd_block}"
+            f"KEY SKILLS THE EMPLOYER WANTS: {kw_sample}\n\n"
             "RULES:\n"
-            "1. TRUTHFUL ONLY - rephrase, never fabricate new experience or skills.\n"
+            "1. TRUTHFUL ONLY - rephrase using the employer's language, never fabricate new experience or skills.\n"
             "2. PRESERVE all numbers, percentages, and measurable results exactly.\n"
-            "3. Use a strong action verb (developed, implemented, optimised, led, built).\n"
-            "4. LENGTH: 12-20 words maximum.\n"
-            "5. ATS-friendly: plain text, no bullets, no markdown, no punctuation at end.\n"
-            "6. Return ONLY the rewritten bullet. No explanation, no preamble."
+            "3. Reframe the experience to emphasize aspects most relevant to THIS specific job.\n"
+            "4. Use terminology and keywords from the job description where they honestly apply.\n"
+            "5. Start with a strong action verb (developed, implemented, optimised, led, built, engineered).\n"
+            "6. LENGTH: 12-25 words.\n"
+            "7. ATS-friendly: plain text, no bullets, no markdown, no punctuation at end.\n"
+            "8. Return ONLY the rewritten bullet. No explanation, no preamble."
         )
 
         style_block = self._build_style_constraints(style_fingerprint)
@@ -181,6 +196,7 @@ class GeminiRewriter:
         job_title: str,
         keywords: List[str],
         years_experience: int = 0,
+        job_description: str = "",
         style_fingerprint: Optional[dict] = None,
     ) -> str:
         """Generate a tailored professional summary for a specific job.
@@ -191,6 +207,7 @@ class GeminiRewriter:
             keywords: Key skills and technologies required by the job.
             years_experience: Total years of professional experience (used
                 to keep the summary accurate).
+            job_description: Excerpt from the job posting for context.
             style_fingerprint: Optional style fingerprint dict. When provided,
                 voice constraints are explicitly enforced in the summary.
 
@@ -203,19 +220,26 @@ class GeminiRewriter:
 
         exp_phrase = f"{years_experience}+ years of experience" if years_experience else "proven experience"
         kw_sample = ", ".join(keywords[:8]) if keywords else "software engineering"
+
+        jd_block = ""
+        if job_description:
+            jd_block = f"JOB REQUIREMENTS EXCERPT:\n{job_description[:500]}\n\n"
+
         prompt = (
-            "You are an expert resume writer. Rewrite the professional summary below "
-            "to target the specific job role.\n\n"
+            "You are an expert resume writer customizing a summary for a specific job. "
+            "Rewrite the professional summary below to directly address what this employer "
+            "is looking for.\n\n"
             f"ORIGINAL SUMMARY:\n{original_summary}\n\n"
             f"TARGET ROLE: {job_title}\n"
             f"CANDIDATE EXPERIENCE: {exp_phrase}\n"
+            f"{jd_block}"
             f"KEY SKILLS TO HIGHLIGHT: {kw_sample}\n\n"
             "RULES:\n"
             "1. TRUTHFUL ONLY - base everything on the original summary content.\n"
             "2. 2-3 sentences, 40-60 words total.\n"
             "3. Open with the job title or a senior professional label.\n"
-            "4. Incorporate 3-5 keywords naturally.\n"
-            "5. End with a value proposition statement.\n"
+            "4. Incorporate 3-5 keywords from the job description naturally.\n"
+            "5. End with a value proposition statement relevant to this specific role.\n"
             "6. Plain text only - no markdown, no bullet points.\n"
             "7. Return ONLY the summary. No preamble, no explanation."
         )
@@ -386,45 +410,49 @@ class GeminiRewriter:
         bullets: List[str],
         job_keywords: List[str],
         job_context: str,
-        max_rewrites: int = 5,
+        job_description: str = "",
+        max_rewrites: int = 10,
         style_fingerprint: Optional[dict] = None,
     ) -> List[str]:
         """Rewrite up to *max_rewrites* bullets from a list.
 
-        The most relevant bullets (scored by keyword overlap) are selected
-        for rewriting; the rest are returned unchanged.
+        Bullets with the most keyword overlap are prioritised, but ALL
+        selected bullets are rewritten regardless of overlap score — the
+        AI uses the full job description to reframe each bullet.
 
         Args:
             bullets: All bullet points for a resume section.
             job_keywords: Job description keywords.
             job_context: Brief job context string.
-            max_rewrites: Maximum number of bullets to rewrite (default 5).
+            job_description: Excerpt from the job posting for context.
+            max_rewrites: Maximum number of bullets to rewrite (default 10).
             style_fingerprint: Optional style fingerprint passed through to
                 :meth:`rewrite_bullet_point`.
 
         Returns:
-            List of bullet strings with top-ranked bullets rewritten.
+            List of bullet strings with selected bullets rewritten.
         """
         if not bullets:
             return bullets
 
-        # Score each bullet by keyword overlap (substring match handles multi-word phrases)
+        # Score each bullet by keyword overlap to prioritise order
         kw_lower = {kw.lower() for kw in job_keywords}
         scores = [
             sum(1 for kw in kw_lower if kw in bullet.lower())
             for bullet in bullets
         ]
 
-        # Indices of top-scoring bullets (limited to max_rewrites)
+        # Select top bullets by score, but rewrite ALL of them (no score>0 gate)
         top_indices = set(
             sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:max_rewrites]
         )
 
         result: List[str] = []
         for idx, bullet in enumerate(bullets):
-            if idx in top_indices and scores[idx] > 0:
+            if idx in top_indices:
                 rewritten = self.rewrite_bullet_point(
                     bullet, job_keywords, job_context,
+                    job_description=job_description,
                     style_fingerprint=style_fingerprint,
                 )
                 result.append(rewritten)

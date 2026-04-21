@@ -75,7 +75,7 @@ SECTION_ORDER = [
     "projects",
 ]
 
-SECTION_TITLES = {
+SECTION_TITLES_UPPER = {
     "professional_summary": "PROFESSIONAL SUMMARY",
     "work_experience":      "WORK EXPERIENCE",
     "education":            "EDUCATION",
@@ -83,3 +83,26 @@ SECTION_TITLES = {
     "certifications":       "CERTIFICATIONS",
     "projects":             "PROJECTS",
 }
+
+SECTION_TITLES_TITLE_COLON = {
+    "professional_summary": "Professional Summary:",
+    "work_experience":      "Work Experience:",
+    "education":            "Education:",
+    "skills":               "Technical Skills:",
+    "certifications":       "Certifications:",
+    "projects":             "Projects:",
+}
+
+SECTION_TITLES_TITLE = {
+    "professional_summary": "Professional Summary",
+    "work_experience":      "Work Experience",
+    "education":            "Education",
+    "skills":               "Technical Skills",
+    "certifications":       "Certifications",
+    "projects":             "Projects",
+}
+
+# Backwards-compat alias — existing call sites import SECTION_TITLES.
+# Points to the uppercase variant to preserve historic behaviour for
+# templates that have not yet been migrated to fingerprint-aware rendering.
+SECTION_TITLES = SECTION_TITLES_UPPER

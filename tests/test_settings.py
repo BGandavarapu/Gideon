@@ -481,7 +481,7 @@ class TestDashboardAutoBadge(unittest.TestCase):
 
         import web.app as app_module
         with patch.object(app_module, "get_db", return_value=mock_db):
-            r = self.client.get("/")
+            r = self.client.get("/dashboard")
         self.assertEqual(r.status_code, 200)
         return r.data.decode("utf-8", errors="replace")
 

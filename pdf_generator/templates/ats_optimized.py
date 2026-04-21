@@ -2,30 +2,9 @@
 ATS-Optimised resume template.
 
 Produces a plain, single-column PDF that is maximally compatible with
-Applicant Tracking Systems:
-
-- Standard built-in fonts only (Helvetica / Times).
-- No images, no colour fills, no table structures.
-- Linear top-to-bottom reading order.
-- Unicode bullet replaced with a plain hyphen for widest parser support.
-- Thin horizontal rules between sections (safe for most parsers).
-- Contact details on a single line separated by ``|``.
-
-Layout order (sections missing from the data are silently skipped):
-
-    Name + contact
-    ──────────────────────────────────────────
-    PROFESSIONAL SUMMARY
-    ──────────────────────────────────────────
-    WORK EXPERIENCE
-    ──────────────────────────────────────────
-    EDUCATION
-    ──────────────────────────────────────────
-    SKILLS
-    ──────────────────────────────────────────
-    CERTIFICATIONS
-    ──────────────────────────────────────────
-    PROJECTS
+Applicant Tracking Systems. Layout is linear, monochrome, and driven by
+the style fingerprint so that the tailored PDF matches the original
+uploaded resume's font, bullet character, and section-header style.
 """
 
 import logging
@@ -44,13 +23,12 @@ from pdf_generator.styles import (
     PAGE_BOTTOM_MARGIN,
     SECTION_GAP,
     SECTION_ORDER,
-    SECTION_TITLES,
+    SECTION_TITLES_TITLE,
+    SECTION_TITLES_TITLE_COLON,
+    SECTION_TITLES_UPPER,
 )
 
 logger = logging.getLogger(__name__)
-
-# ATS parsers often choke on the Unicode bullet; use a plain hyphen.
-_BULLET = "-"
 
 
 class ATSOptimizedTemplate(BasePDFTemplate):
@@ -61,23 +39,31 @@ class ATSOptimizedTemplate(BasePDFTemplate):
     # ------------------------------------------------------------------
 
     def generate_pdf(self, resume_data: Dict, output_path: str) -> None:
-        """Render *resume_data* to a PDF at *output_path*.
-
-        Args:
-            resume_data: Structured resume dictionary.
-            output_path: Filesystem path for the output ``.pdf`` file.
-        """
+        """Render *resume_data* to a PDF at *output_path*."""
         c = rl_canvas.Canvas(output_path, pagesize=(self.page_width, self.page_height))
         y = self.page_height - self.margin
 
+        self._title_map = self._select_title_map()
+
         y = self._draw_header(c, resume_data.get("personal_info", {}), y)
 
-        for section_key in SECTION_ORDER:
+        seen = set()
+        effective_order = []
+        for key in resume_data:
+            if key in SECTION_ORDER and key not in seen:
+                effective_order.append(key)
+                seen.add(key)
+        for key in SECTION_ORDER:
+            if key not in seen:
+                effective_order.append(key)
+                seen.add(key)
+
+        for section_key in effective_order:
             if section_key not in resume_data or not resume_data[section_key]:
                 continue
 
             y = self.check_page_break(c, y, needed=40, bottom=PAGE_BOTTOM_MARGIN)
-            y -= SECTION_GAP  # breathing room before each section
+            y -= SECTION_GAP
 
             if section_key == "professional_summary":
                 y = self._draw_summary(c, resume_data[section_key], y)
@@ -96,34 +82,62 @@ class ATSOptimizedTemplate(BasePDFTemplate):
         logger.info("ATS-optimised PDF saved: %s", output_path)
 
     # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _select_title_map(self) -> Dict[str, str]:
+        case = self._style.get("section_header_case", "title_colon")
+        if case == "upper":
+            return SECTION_TITLES_UPPER
+        if case == "title":
+            return SECTION_TITLES_TITLE
+        return SECTION_TITLES_TITLE_COLON
+
+    def _section_header(self, c: rl_canvas.Canvas, y: float, key: str) -> float:
+        return self.draw_section_rule(
+            c, y, self._title_map[key],
+            font_name=self._style["bold_font"],
+            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
+        )
+
+    # ------------------------------------------------------------------
     # Section renderers
     # ------------------------------------------------------------------
 
     def _draw_header(self, c: rl_canvas.Canvas, info: Dict, y: float) -> float:
-        """Render name + contact line."""
         pal = ATSPalette
+        bold = self._style["bold_font"]
+        body = self._style["body_font"]
+        centered = self._style.get("name_alignment") == "center"
 
-        # Name
         name = info.get("name", "").strip()
-        c.setFont("Helvetica-Bold", FontSizes.name)
+        c.setFont(bold, FontSizes.name)
         c.setFillColor(pal.name_text)
-        c.drawString(self.margin, y, name)
+        if centered:
+            from reportlab.pdfbase.pdfmetrics import stringWidth
+            name_w = stringWidth(name, bold, FontSizes.name)
+            c.drawString((self.page_width - name_w) / 2, y, name)
+        else:
+            c.drawString(self.margin, y, name)
         y -= FontSizes.name + 4
 
-        # Contact line: email | phone | location | linkedin
         contact_parts = []
-        for field in ("email", "phone", "location", "linkedin"):
+        for field in ("email", "phone", "location", "linkedin", "github"):
             val = info.get(field, "").strip()
             if val:
                 contact_parts.append(val)
         contact_line = "  |  ".join(contact_parts)
 
-        c.setFont("Helvetica", FontSizes.contact)
+        c.setFont(body, FontSizes.contact)
         c.setFillColor(pal.contact_text)
-        c.drawString(self.margin, y, contact_line)
+        if centered:
+            from reportlab.pdfbase.pdfmetrics import stringWidth
+            cw = stringWidth(contact_line, body, FontSizes.contact)
+            c.drawString((self.page_width - cw) / 2, y, contact_line)
+        else:
+            c.drawString(self.margin, y, contact_line)
         y -= FontSizes.contact + 10
 
-        # Thin rule under header
         c.setStrokeColor(pal.rule_line)
         c.setLineWidth(0.5)
         c.line(self.margin, y, self.page_width - self.margin, y)
@@ -132,12 +146,10 @@ class ATSOptimizedTemplate(BasePDFTemplate):
         return y
 
     def _draw_summary(self, c: rl_canvas.Canvas, summary: str, y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["professional_summary"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
-        lines = self.wrap_text(summary, self.content_width, "Helvetica", FontSizes.body)
-        c.setFont("Helvetica", FontSizes.body)
+        body = self._style["body_font"]
+        y = self._section_header(c, y, "professional_summary")
+        lines = self.wrap_text(summary, self.content_width, body, FontSizes.body)
+        c.setFont(body, FontSizes.body)
         c.setFillColor(ATSPalette.body_text)
         for line in lines:
             y = self.check_page_break(c, y)
@@ -146,10 +158,11 @@ class ATSOptimizedTemplate(BasePDFTemplate):
         return y
 
     def _draw_experience(self, c: rl_canvas.Canvas, experience: List[Dict], y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["work_experience"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
+        bold = self._style["bold_font"]
+        body = self._style["body_font"]
+        bullet_char = self._style["bullet_char"]
+
+        y = self._section_header(c, y, "work_experience")
 
         for job in experience:
             title   = job.get("title", "").strip()
@@ -157,53 +170,47 @@ class ATSOptimizedTemplate(BasePDFTemplate):
             loc     = job.get("location", "").strip()
             dates   = job.get("dates", "").strip()
 
-            # Ensure room for at least title + company + 1 bullet
             y = self.check_page_break(c, y, needed=50)
 
-            # Job title (bold)
-            c.setFont("Helvetica-Bold", FontSizes.job_title)
+            c.setFont(bold, FontSizes.job_title)
             c.setFillColor(ATSPalette.body_text)
             c.drawString(self.margin, y, title)
 
-            # Dates right-aligned on the same line
             if dates:
-                self.draw_right_aligned(c, y, dates, "Helvetica", FontSizes.date_right)
+                self.draw_right_aligned(c, y, dates, body, FontSizes.date_right)
 
             y -= LINE_SPACING
 
-            # Company | location
             company_line_parts = [p for p in (company, loc) if p]
             company_line = "  |  ".join(company_line_parts)
-            c.setFont("Helvetica", FontSizes.company)
+            c.setFont(body, FontSizes.company)
             c.setFillColor(ATSPalette.body_text)
             c.drawString(self.margin, y, company_line)
             y -= LINE_SPACING + 2
 
-            # Bullets
             for bullet in job.get("bullets", []):
                 if not bullet.strip():
                     continue
                 y = self.draw_bullet_line(
                     c, y, bullet.strip(),
-                    font_name="Helvetica", font_size=FontSizes.bullet,
-                    bullet_char=_BULLET,
+                    font_name=body, font_size=FontSizes.bullet,
+                    bullet_char=bullet_char,
                 )
 
-            y -= 6   # gap between positions
+            y -= 6
 
         return y
 
     def _draw_education(self, c: rl_canvas.Canvas, education: List, y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["education"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
+        bold = self._style["bold_font"]
+        body = self._style["body_font"]
+
+        y = self._section_header(c, y, "education")
 
         for edu in education:
             if isinstance(edu, str):
-                # Plain string entry
                 y = self.check_page_break(c, y)
-                c.setFont("Helvetica", FontSizes.body)
+                c.setFont(body, FontSizes.body)
                 c.setFillColor(ATSPalette.body_text)
                 c.drawString(self.margin, y, edu)
                 y -= LINE_SPACING
@@ -216,36 +223,73 @@ class ATSOptimizedTemplate(BasePDFTemplate):
 
             y = self.check_page_break(c, y, needed=35)
 
-            c.setFont("Helvetica-Bold", FontSizes.job_title)
+            c.setFont(bold, FontSizes.job_title)
             c.setFillColor(ATSPalette.body_text)
             c.drawString(self.margin, y, degree)
             if year:
-                self.draw_right_aligned(c, y, year, "Helvetica", FontSizes.date_right)
+                self.draw_right_aligned(c, y, year, body, FontSizes.date_right)
             y -= LINE_SPACING
 
             school_line = school
+            loc = edu.get("location", "").strip()
+            if loc:
+                school_line += f", {loc}"
             if gpa:
                 school_line += f"  |  GPA: {gpa}"
-            c.setFont("Helvetica", FontSizes.company)
+            c.setFont(body, FontSizes.company)
             c.drawString(self.margin, y, school_line)
-            y -= LINE_SPACING + 4
+            y -= LINE_SPACING + 2
+
+            coursework = edu.get("coursework", "").strip()
+            if coursework:
+                y = self.check_page_break(c, y, needed=20)
+                cw_label = "Relevant Coursework: "
+                c.setFont(bold, FontSizes.body)
+                label_w = c.stringWidth(cw_label, bold, FontSizes.body)
+                c.drawString(self.margin, y, cw_label)
+                c.setFont(body, FontSizes.body)
+                c.drawString(self.margin + label_w, y, coursework)
+                y -= LINE_SPACING + 2
 
         return y
 
     def _draw_skills(self, c: rl_canvas.Canvas, skills, y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["skills"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
+        bold = self._style["bold_font"]
+        body = self._style["body_font"]
 
-        # Normalise: skills can be a list of strings or a dict of categories
+        y = self._section_header(c, y, "skills")
+
+        if isinstance(skills, dict):
+            for category, items in skills.items():
+                if not isinstance(items, list) or not items:
+                    continue
+                label = f"{category}: "
+                value = ", ".join(str(i) for i in items if i)
+
+                label_w = c.stringWidth(label, bold, FontSizes.skills)
+                remaining_w = self.content_width - label_w
+                wrapped = self.wrap_text(value, remaining_w, body, FontSizes.skills)
+
+                y = self.check_page_break(c, y)
+                c.setFont(bold, FontSizes.skills)
+                c.setFillColor(ATSPalette.body_text)
+                c.drawString(self.margin, y, label)
+                c.setFont(body, FontSizes.skills)
+                if wrapped:
+                    c.drawString(self.margin + label_w, y, wrapped[0])
+                y -= LINE_SPACING
+                for extra in wrapped[1:]:
+                    y = self.check_page_break(c, y)
+                    c.drawString(self.margin + label_w, y, extra)
+                    y -= LINE_SPACING
+            return y
+
         skill_lines = self._format_skills(skills)
-
-        c.setFont("Helvetica", FontSizes.skills)
+        c.setFont(body, FontSizes.skills)
         c.setFillColor(ATSPalette.body_text)
         for line in skill_lines:
             y = self.check_page_break(c, y)
-            wrapped = self.wrap_text(line, self.content_width, "Helvetica", FontSizes.skills)
+            wrapped = self.wrap_text(line, self.content_width, body, FontSizes.skills)
             for wl in wrapped:
                 c.drawString(self.margin, y, wl)
                 y -= LINE_SPACING
@@ -253,10 +297,8 @@ class ATSOptimizedTemplate(BasePDFTemplate):
         return y
 
     def _draw_certifications(self, c: rl_canvas.Canvas, certs: List, y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["certifications"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
+        body = self._style["body_font"]
+        y = self._section_header(c, y, "certifications")
         for cert in certs:
             if isinstance(cert, str):
                 text = cert
@@ -272,7 +314,7 @@ class ATSOptimizedTemplate(BasePDFTemplate):
                 text = "  |  ".join(parts)
 
             y = self.check_page_break(c, y)
-            c.setFont("Helvetica", FontSizes.body)
+            c.setFont(body, FontSizes.body)
             c.setFillColor(ATSPalette.body_text)
             c.drawString(self.margin, y, text)
             y -= LINE_SPACING
@@ -280,25 +322,42 @@ class ATSOptimizedTemplate(BasePDFTemplate):
         return y
 
     def _draw_projects(self, c: rl_canvas.Canvas, projects: List[Dict], y: float) -> float:
-        y = self.draw_section_rule(
-            c, y, SECTION_TITLES["projects"],
-            text_color=ATSPalette.header_text, rule_color=ATSPalette.rule_line,
-        )
+        bold = self._style["bold_font"]
+        body = self._style["body_font"]
+        bullet_char = self._style["bullet_char"]
+
+        y = self._section_header(c, y, "projects")
         for proj in projects:
-            name  = proj.get("name", "").strip()
-            desc  = proj.get("description", "").strip()
-            tech  = proj.get("tech", proj.get("technologies", []))
+            name    = proj.get("name", "").strip()
+            date    = proj.get("date", "").strip()
+            desc    = proj.get("description", "").strip()
+            bullets = proj.get("bullets", [])
+            tech    = proj.get("tech", proj.get("technologies", []))
 
             y = self.check_page_break(c, y, needed=30)
 
-            c.setFont("Helvetica-Bold", FontSizes.job_title)
+            c.setFont(bold, FontSizes.job_title)
             c.setFillColor(ATSPalette.body_text)
             c.drawString(self.margin, y, name)
+            if date:
+                self.draw_right_aligned(c, y, date, body, FontSizes.date_right)
             y -= LINE_SPACING
 
-            if desc:
-                lines = self.wrap_text(desc, self.content_width, "Helvetica", FontSizes.body)
-                c.setFont("Helvetica", FontSizes.body)
+            if bullets:
+                bullet_width = self.content_width - 15
+                for bullet in bullets:
+                    lines = self.wrap_text(bullet, bullet_width, body, FontSizes.body)
+                    for i, line in enumerate(lines):
+                        y = self.check_page_break(c, y)
+                        c.setFont(body, FontSizes.body)
+                        if i == 0:
+                            c.drawString(self.margin + 5, y, f"{bullet_char}  {line}")
+                        else:
+                            c.drawString(self.margin + 15, y, line)
+                        y -= LINE_SPACING
+            elif desc:
+                lines = self.wrap_text(desc, self.content_width, body, FontSizes.body)
+                c.setFont(body, FontSizes.body)
                 for line in lines:
                     y = self.check_page_break(c, y)
                     c.drawString(self.margin, y, line)
@@ -306,8 +365,8 @@ class ATSOptimizedTemplate(BasePDFTemplate):
 
             if tech:
                 tech_str = "Technologies: " + ", ".join(tech if isinstance(tech, list) else [str(tech)])
-                lines = self.wrap_text(tech_str, self.content_width, "Helvetica", FontSizes.body)
-                c.setFont("Helvetica", FontSizes.body)
+                lines = self.wrap_text(tech_str, self.content_width, body, FontSizes.body)
+                c.setFont(body, FontSizes.body)
                 for line in lines:
                     y = self.check_page_break(c, y)
                     c.drawString(self.margin, y, line)
@@ -323,18 +382,14 @@ class ATSOptimizedTemplate(BasePDFTemplate):
 
     @staticmethod
     def _format_skills(skills) -> List[str]:
-        """Normalise skills (list or dict) into display lines."""
         if isinstance(skills, list):
-            # Flat list: join onto wrapped lines (comma-separated)
             return [", ".join(str(s) for s in skills if s)]
 
         if isinstance(skills, dict):
-            # Categorised: one line per category
             lines = []
             for category, items in skills.items():
                 if isinstance(items, list):
-                    label = category.replace("_", " ").title()
-                    lines.append(f"{label}: {', '.join(str(i) for i in items if i)}")
+                    lines.append(f"{category}: {', '.join(str(i) for i in items if i)}")
             return lines
 
         return [str(skills)]

@@ -1,4 +1,4 @@
-# Resume Auto-Tailor App - Complete Development Plan for Cursor AI
+# Gideon - Complete Development Plan for Cursor AI
 
 ## Project Overview
 Build a Python application that automatically scrapes job postings from the internet, analyzes job requirements, and generates customized resumes tailored to each job description.
@@ -158,23 +158,23 @@ def calculate_match_score(job_keywords, resume_keywords):
 
 ---
 
-## Phase 4: Resume Modification Engine (UPDATED FOR GEMINI)
+## Phase 4: Resume Modification Engine (UPDATED FOR NVIDIA NIM)
 
 ### Objective
-Automatically modify resume content to align with job requirements while maintaining truthfulness using Google's Gemini API.
+Automatically modify resume content to align with job requirements while maintaining truthfulness using NVIDIA NIM (Nemotron).
 
 ### Technical Requirements
-- Use Google Gemini API (free tier with gemini-1.5-flash model)
+- Use NVIDIA NIM API (nvidia/llama-3.3-nemotron-super-49b-v1.5)
 - Implement template system for different resume formats
 - Maintain factual accuracy (only rephrase, don't fabricate)
 - Preserve original achievements while emphasizing relevant ones
 - Handle API rate limits and errors gracefully
 
 ### API Configuration
-- **Model**: gemini-1.5-flash (fast and free)
-- **API Key**: Store in .env as GEMINI_API_KEY
-- **Rate Limits**: 60 requests per minute (free tier)
-- **Package**: google-generativeai
+- **Model**: nvidia/llama-3.3-nemotron-super-49b-v1.5
+- **API Key**: Store in .env as NVIDIA_API_KEY
+- **Rate Limits**: 60 RPM / 5000 RPD
+- **Package**: openai (OpenAI-compatible endpoint)
 
 ### Modification Strategies
 1. **Bullet Point Rewriting**: Rephrase achievements to include job keywords
@@ -183,28 +183,31 @@ Automatically modify resume content to align with job requirements while maintai
 4. **Project Highlighting**: Emphasize relevant projects
 5. **Keyword Injection**: Naturally incorporate missing keywords where appropriate
 
-### Gemini Integration Pattern
+### NVIDIA NIM Integration Pattern
 ```python
-import google.generativeai as genai
+from openai import OpenAI
 import os
 from typing import List, Dict
 
-class GeminiRewriter:
+class Rewriter:
     """
-    AI-powered resume content rewriter using Google Gemini API.
+    AI-powered resume content rewriter using NVIDIA NIM (Nemotron).
     
     Handles intelligent rephrasing of resume content to match job requirements
     while maintaining truthfulness and professional quality.
     """
     
     def __init__(self):
-        """Initialize Gemini API with configuration from environment."""
-        api_key = os.getenv('GEMINI_API_KEY')
+        """Initialize NVIDIA NIM client from environment."""
+        api_key = os.getenv('NVIDIA_API_KEY')
         if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment variables")
+            raise ValueError("NVIDIA_API_KEY not found in environment variables")
         
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self._client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key,
+        )
+        self.model_id = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         
     def rewrite_bullet_point(
         self, 
@@ -356,7 +359,7 @@ def tailor_work_experience(
     Returns:
         Modified work experience with tailored bullets
     """
-    rewriter = GeminiRewriter()
+    rewriter = Rewriter()
     job_context = f"Job: {job_description[:200]}..."
     
     tailored_bullets = []
@@ -384,7 +387,7 @@ import time
 from functools import wraps
 
 def rate_limit(calls_per_minute=60):
-    """Decorator to enforce rate limiting for Gemini API calls."""
+    """Decorator to enforce rate limiting for NIM API calls."""
     min_interval = 60.0 / calls_per_minute
     last_called = [0.0]
     
@@ -404,7 +407,7 @@ def rate_limit(calls_per_minute=60):
         return wrapper
     return decorator
 
-class GeminiRewriter:
+class Rewriter:
     @rate_limit(calls_per_minute=55)  # Slightly under limit for safety
     def rewrite_bullet_point(self, original_bullet, job_keywords, job_context):
         # ... implementation from above
@@ -415,24 +418,24 @@ class GeminiRewriter:
 resume_engine/
 ├── __init__.py
 ├── modifier.py               # Core modification logic
-├── gemini_rewriter.py        # Gemini API integration (UPDATED)
+├── rewriter.py        # NVIDIA NIM integration
 ├── templates.py              # Resume structure templates
 ├── validator.py              # Ensure modifications are truthful
 └── rate_limiter.py           # API rate limiting utilities
 ```
 
-### Configuration for Gemini (.env)
+### Configuration (.env)
 ```
-# Google Gemini API Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
+# NVIDIA NIM API Configuration
+NVIDIA_API_KEY=your_nvidia_api_key_here
 ```
 
 ### Configuration (config.yaml) - AI Section
 ```yaml
 ai:
-  provider: gemini
-  model: gemini-1.5-flash
-  api_key: ${GEMINI_API_KEY}
+  provider: nvidia_nim
+  model: nvidia/llama-3.3-nemotron-super-49b-v1.5
+  api_key: ${NVIDIA_API_KEY}
   max_tokens: 1000
   temperature: 0.7
   rate_limit_rpm: 55  # Requests per minute (under 60 limit)
@@ -440,23 +443,23 @@ ai:
   retry_delay: 2  # seconds
 ```
 
-### Testing Gemini Integration
+### Testing NIM Integration
 ```python
-# tests/test_gemini_rewriter.py
+# tests/test_rewriter.py
 import os
 import pytest
-from resume_engine.gemini_rewriter import GeminiRewriter
+from resume_engine.rewriter import Rewriter
 
-def test_gemini_api_connection():
-    """Test that Gemini API is properly configured."""
-    assert os.getenv('GEMINI_API_KEY'), "GEMINI_API_KEY not set"
+def test_nim_api_connection():
+    """Test that NVIDIA NIM API is properly configured."""
+    assert os.getenv('NVIDIA_API_KEY'), "NVIDIA_API_KEY not set"
     
-    rewriter = GeminiRewriter()
+    rewriter = Rewriter()
     assert rewriter.model is not None
 
 def test_bullet_point_rewriting():
     """Test that bullet points are rewritten appropriately."""
-    rewriter = GeminiRewriter()
+    rewriter = Rewriter()
     
     original = "Built web applications using Python"
     keywords = ["Django", "REST API", "PostgreSQL"]
@@ -471,7 +474,7 @@ def test_bullet_point_rewriting():
 
 def test_rate_limiting():
     """Test that rate limiting prevents excessive API calls."""
-    rewriter = GeminiRewriter()
+    rewriter = Rewriter()
     
     start_time = time.time()
     
@@ -495,7 +498,7 @@ def test_rate_limiting():
 - **Monthly cost**: $0 (completely free)
 - **Context window**: 1M tokens input, 8K tokens output
 
-### Best Practices for Gemini Usage
+### Best Practices for NVIDIA NIM Usage
 1. **Batch Processing**: Group multiple bullet points when possible
 2. **Caching**: Cache common rewrites to reduce API calls
 3. **Fallback**: Always have original content as fallback
@@ -651,7 +654,7 @@ resume-auto-tailor/
 ├── scraper/                  # Phase 1
 ├── database/                 # Phase 2
 ├── analyzer/                 # Phase 3
-├── resume_engine/            # Phase 4 (GEMINI)
+├── resume_engine/            # Phase 4 (NVIDIA NIM)
 ├── pdf_generator/            # Phase 5
 ├── scheduler/                # Phase 6
 ├── cli/                      # Phase 7
@@ -666,7 +669,7 @@ resume-auto-tailor/
 
 ---
 
-## Dependencies (requirements.txt) - UPDATED FOR GEMINI
+## Dependencies (requirements.txt) - UPDATED FOR NVIDIA NIM
 ```txt
 # Web Scraping
 beautifulsoup4==4.12.2
@@ -683,8 +686,8 @@ spacy==3.7.2
 nltk==3.8.1
 scikit-learn==1.3.2
 
-# AI API - GEMINI (FREE)
-google-generativeai==0.3.2
+# AI API - NVIDIA NIM (OpenAI-compatible)
+openai>=1.0.0
 
 # PDF Generation
 reportlab==4.0.7
@@ -712,7 +715,7 @@ pydantic==2.5.0
 
 ---
 
-## Configuration (config.yaml) - UPDATED FOR GEMINI
+## Configuration (config.yaml) - UPDATED FOR NVIDIA NIM
 ```yaml
 scraping:
   delay_min: 2  # seconds
@@ -729,9 +732,9 @@ database:
   path: data/jobs.db
 
 ai:
-  provider: gemini
-  model: gemini-1.5-flash
-  api_key: ${GEMINI_API_KEY}
+  provider: nvidia_nim
+  model: nvidia/llama-3.3-nemotron-super-49b-v1.5
+  api_key: ${NVIDIA_API_KEY}
   max_tokens: 1000
   temperature: 0.7
   rate_limit_rpm: 55
@@ -756,10 +759,10 @@ notifications:
 
 ---
 
-## Environment Variables (.env.example) - UPDATED FOR GEMINI
+## Environment Variables (.env.example) - UPDATED FOR NVIDIA NIM
 ```
-# Google Gemini API (get from https://makersuite.google.com/app/apikey)
-GEMINI_API_KEY=your_gemini_api_key_here
+# NVIDIA NIM API (get from https://build.nvidia.com)
+NVIDIA_API_KEY=your_nvidia_api_key_here
 
 # Database
 DATABASE_PATH=data/jobs.db
@@ -785,8 +788,8 @@ NOTIFY_EMAIL=
 - Implement keyword extraction (Phase 3)
 - Build skill matching algorithm (Phase 3)
 
-### Week 3: Resume Engine with Gemini
-- Set up Gemini API integration (Phase 4)
+### Week 3: Resume Engine with NVIDIA NIM
+- Set up NVIDIA NIM integration (Phase 4)
 - Build resume modification logic (Phase 4)
 - Test with sample resumes
 - Implement rate limiting and error handling
@@ -812,8 +815,8 @@ NOTIFY_EMAIL=
 - **Terms of Service**: Review LinkedIn/Indeed TOS before scraping
 - **Resume Accuracy**: Never fabricate experience or skills - only rephrase
 
-### 2. API Keys & Security (GEMINI SPECIFIC)
-- Get free Gemini API key from: https://makersuite.google.com/app/apikey
+### 2. API Keys & Security (NVIDIA NIM)
+- Get NVIDIA API key from: https://build.nvidia.com
 - Store API key in `.env` file (never commit to git)
 - Use environment variables for sensitive data
 - Add `.env` to `.gitignore`
@@ -821,7 +824,7 @@ NOTIFY_EMAIL=
 
 ### 3. Error Handling
 - Gracefully handle scraping failures (sites change HTML structure)
-- Handle Gemini API errors (rate limits, timeouts, invalid responses)
+- Handle NIM API errors (rate limits, timeouts, invalid responses)
 - Log all errors with timestamps
 - Implement retry logic with exponential backoff
 - Notify user of critical failures
@@ -830,7 +833,7 @@ NOTIFY_EMAIL=
 ### 4. Testing Strategy
 - Unit tests for keyword extraction
 - Integration tests for database operations
-- Mock Gemini API calls for testing (don't waste quota)
+- Mock NIM API calls for testing (don't waste quota)
 - Test PDF generation with various resume formats
 - Validate AI output quality
 
@@ -839,38 +842,41 @@ NOTIFY_EMAIL=
 - Batch database operations
 - Use connection pooling
 - Implement lazy loading for web interface
-- Cache common Gemini API responses
-- Rate limit Gemini calls to avoid hitting quotas
+- Cache common NIM API responses
+- Rate limit NIM calls to avoid hitting quotas
 
 ---
 
-## Gemini API Setup Guide
+## NVIDIA NIM API Setup Guide
 
 ### Getting Your API Key
-1. Go to https://makersuite.google.com/app/apikey
-2. Sign in with your Google account
+1. Go to https://build.nvidia.com
+2. Sign in with your NVIDIA account
 3. Click "Create API Key"
 4. Copy the key
 5. Add to your `.env` file:
 ```
-   GEMINI_API_KEY=your_actual_key_here
+   NVIDIA_API_KEY=your_actual_key_here
 ```
 
-### Testing Your Gemini Setup
+### Testing Your NIM Setup
 ```python
-# test_gemini.py
-import google.generativeai as genai
+# test_nim.py
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-1.5-flash')
-
-response = model.generate_content("Say hello!")
-print(response.text)
-# Should print: "Hello! 👋  How can I help you today?"
+client = OpenAI(
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=os.getenv('NVIDIA_API_KEY'),
+)
+response = client.chat.completions.create(
+    model="nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    messages=[{"role": "user", "content": "Say hello!"}],
+)
+print(response.choices[0].message.content)
 ```
 
 ### Free Tier Limits (as of 2024)
@@ -890,15 +896,15 @@ When working with Cursor AI to build this:
 2. **Be Specific**: Reference this plan and specific file paths
 3. **Iterative Development**: Test each component before moving on
 4. **Use Comments**: Ask Cursor to add detailed comments explaining logic
-5. **For Gemini Integration**: Specifically mention "Use Google Gemini API with gemini-1.5-flash model"
+5. **For NIM Integration**: Specifically mention "Use NVIDIA NIM API with nvidia/llama-3.3-nemotron-super-49b-v1.5"
 6. **Example Prompt**: 
 ```
    Using the plan in PROJECT_PLAN.md, implement Phase 4 (Resume Modification Engine).
    
-   IMPORTANT: Use Google Gemini API (google-generativeai package) with the gemini-1.5-flash model.
+   IMPORTANT: Use NVIDIA NIM API (openai package, OpenAI-compatible) with nvidia/llama-3.3-nemotron-super-49b-v1.5.
    
-   Create resume_engine/gemini_rewriter.py with:
-   - GeminiRewriter class
+   Create resume_engine/rewriter.py with:
+   - Rewriter class
    - rewrite_bullet_point() method
    - generate_professional_summary() method
    - Rate limiting decorator (55 requests/minute)
@@ -915,22 +921,22 @@ When working with Cursor AI to build this:
 Your app is working well when:
 - ✅ Successfully scrapes 20+ jobs per search query
 - ✅ Extracts keywords with 80%+ accuracy
-- ✅ Gemini API successfully rewrites bullet points
+- ✅ NVIDIA NIM successfully rewrites bullet points
 - ✅ Generates resumes that increase match scores by 15+ points
 - ✅ Creates ATS-compatible PDFs
 - ✅ Runs automatically on schedule without crashes
 - ✅ Provides clear feedback via CLI or web interface
-- ✅ Stays within Gemini free tier limits
+- ✅ Stays within NVIDIA NIM quota limits
 
 ---
 
 ## Future Enhancements (v2.0)
 
-- Cover letter generation using Gemini
-- Interview preparation based on job description (Gemini-powered)
+- Cover letter generation using NVIDIA NIM
+- Interview preparation based on job description (NIM-powered)
 - Multi-language support
 - Integration with LinkedIn Easy Apply
 - Chrome extension for one-click tailoring
 - Analytics: track which modifications lead to interviews
 - A/B testing different resume versions
-- Gemini fine-tuning for better resume writing (when available)
+- NIM model upgrades for better resume writing (when available)

@@ -1080,7 +1080,7 @@ def generate_resume(
     dry_run: bool,
     output: str | None,
 ) -> None:
-    """Generate a tailored resume for a specific job using Gemini AI.
+    """Generate a tailored resume for a specific job using NVIDIA NIM (Nemotron).
 
     \b
     Examples:
@@ -1243,7 +1243,7 @@ def generate_resume(
 
 @cli.command("api-usage")
 def api_usage() -> None:
-    """Show Gemini API usage statistics for today (both models).
+    """Show NVIDIA NIM API usage statistics for today.
 
     \b
     Example:
@@ -1251,35 +1251,24 @@ def api_usage() -> None:
     """
     from resume_engine.rate_limiter import RateLimiter
 
-    primary_limiter = RateLimiter(rpm=10, rpd=250, model_key="primary")
-    bulk_limiter    = RateLimiter(rpm=15, rpd=1_000, model_key="bulk")
+    nim_limiter = RateLimiter(rpm=60, rpd=5_000, model_key="nvidia")
 
-    p = primary_limiter.stats()
-    b = bulk_limiter.stats()
+    s = nim_limiter.stats()
 
     usage_table = Table(
-        title="Gemini API Usage",
+        title="NVIDIA NIM API Usage",
         show_header=True,
         header_style="bold magenta",
     )
     usage_table.add_column("Metric", style="cyan", min_width=30)
-    usage_table.add_column("gemini-2.5-flash\n(Primary)", justify="right", min_width=22)
-    usage_table.add_column("gemini-2.5-flash-lite\n(Bulk)", justify="right", min_width=22)
+    usage_table.add_column("llama-3.3-nemotron-super-49b-v1.5", justify="right", min_width=36)
 
-    usage_table.add_row("Calls today", str(p["calls_today"]), str(b["calls_today"]))
-    usage_table.add_row(
-        "Calls remaining (daily)",
-        str(p["calls_remaining_today"]),
-        str(b["calls_remaining_today"]),
-    )
-    usage_table.add_row("Daily limit (RPD)", str(p["rpd_limit"]), str(b["rpd_limit"]))
-    usage_table.add_row("Per-minute limit (RPM)", str(p["rpm_limit"]), str(b["rpm_limit"]))
-    usage_table.add_row(
-        "Estimated tokens today",
-        f"{p['tokens_estimated_today']:,}",
-        f"{b['tokens_estimated_today']:,}",
-    )
-    usage_table.add_row("Quota date", p["quota_date"], b["quota_date"])
+    usage_table.add_row("Calls today", str(s["calls_today"]))
+    usage_table.add_row("Calls remaining (daily)", str(s["calls_remaining_today"]))
+    usage_table.add_row("Daily limit (RPD)", str(s["rpd_limit"]))
+    usage_table.add_row("Per-minute limit (RPM)", str(s["rpm_limit"]))
+    usage_table.add_row("Estimated tokens today", f"{s['tokens_estimated_today']:,}")
+    usage_table.add_row("Quota date", s["quota_date"])
 
     def _pct_colour(remaining: int, limit: int) -> str:
         pct = remaining / limit * 100 if limit else 0
@@ -1288,14 +1277,13 @@ def api_usage() -> None:
 
     usage_table.add_row(
         "Quota remaining %",
-        _pct_colour(p["calls_remaining_today"], p["rpd_limit"]),
-        _pct_colour(b["calls_remaining_today"], b["rpd_limit"]),
+        _pct_colour(s["calls_remaining_today"], s["rpd_limit"]),
     )
 
     console.print()
     console.print(usage_table)
     console.print(
-        "\n[dim]Usage data persisted in [bold]data/gemini_usage.json[/bold][/dim]"
+        "\n[dim]Usage data persisted in [bold]data/nvidia_usage.json[/bold][/dim]"
     )
 
 

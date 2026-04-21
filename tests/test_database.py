@@ -155,7 +155,7 @@ class TestDatabaseManager:
 
     def test_table_names_populated_after_create(self, db_manager: DatabaseManager) -> None:
         names = db_manager.table_names()
-        assert set(names) == {"jobs", "master_resumes", "tailored_resumes", "applications"}
+        assert set(names) == {"jobs", "master_resumes", "tailored_resumes", "applications", "chat_sessions", "chat_messages", "skill_assessments", "assessment_questions", "interview_sessions", "interview_questions"}
 
     def test_safe_url_redacts_password(self) -> None:
         # Construct manager directly to test _safe_url without connecting
@@ -180,7 +180,10 @@ class TestCreateDropTables:
         # Second call must not raise
         db_manager.create_tables()
         assert set(db_manager.table_names()) == {
-            "jobs", "master_resumes", "tailored_resumes", "applications"
+            "jobs", "master_resumes", "tailored_resumes", "applications",
+            "chat_sessions", "chat_messages",
+            "skill_assessments", "assessment_questions",
+            "interview_sessions", "interview_questions",
         }
 
     def test_drop_tables_removes_all_tables(self, db_manager: DatabaseManager) -> None:

@@ -1,7 +1,7 @@
 """StyleExtractor — analyse a master resume and produce a style fingerprint.
 
 The fingerprint captures five orthogonal style dimensions so that the
-Gemini rewriter can reproduce the original author's voice and format in
+NIM rewriter can reproduce the original author's voice and format in
 every tailored variant:
 
     1. Voice           – first_person / third_person / no_pronouns
@@ -14,7 +14,7 @@ Usage::
 
     extractor = StyleExtractor()
     fingerprint = extractor.extract(master_resume.content)
-    # Pass fingerprint to GeminiRewriter.rewrite_bullet_point(
+    # Pass fingerprint to Rewriter.rewrite_bullet_point(
     #     ..., style_fingerprint=fingerprint)
 """
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _METRIC_RE = re.compile(r"\d+[%x]?|\$[\d,]+|\d+\.\d+")
 
 # Leading bullet characters to look for
-_BULLET_CHARS = ("•", "-", "*", "—")
+_BULLET_CHARS = ("•", "●", "-", "*", "—")
 
 
 class StyleExtractor:
@@ -94,12 +94,36 @@ class StyleExtractor:
         structure = self._detect_structure(resume_content)
         fmt = self._detect_format(bullets)
 
+        # If parsed bullets didn't start with a recognisable bullet char,
+        # fall back to the raw-PDF-detected character from the parser.
+        if fmt["bullet_char"] == "none":
+            detected = resume_content.get("detected_bullet_char")
+            if detected and detected != "none":
+                fmt["bullet_char"] = detected
+
+        font_family = resume_content.get("font_family") or "Helvetica"
+        if font_family not in ("Times", "Helvetica", "Courier"):
+            font_family = "Helvetica"
+
+        section_header_style = resume_content.get("section_header_style") or {}
+        if not isinstance(section_header_style, dict):
+            section_header_style = {}
+        section_header_style.setdefault("case", "title_colon")
+        section_header_style.setdefault("rule", True)
+
+        name_alignment = resume_content.get("name_alignment", "left")
+        if name_alignment not in ("center", "left"):
+            name_alignment = "left"
+
         return {
             "voice": voice,
             "sentence_structure": sentence_structure,
             "metric_usage": metric_usage,
             "structure": structure,
             "format": fmt,
+            "font_family": font_family,
+            "section_header_style": section_header_style,
+            "name_alignment": name_alignment,
             "extracted_at": datetime.now(timezone.utc).isoformat(),
             "bullet_count": len(bullets),
         }
@@ -218,9 +242,9 @@ class StyleExtractor:
     def _detect_structure(self, resume_content: dict) -> List[str]:
         """Return an ordered list of non-empty section keys.
 
-        The order follows :attr:`_SECTION_KEYS` for keys that are in the
-        known list; unknown keys are appended in their original iteration
-        order.
+        If the parsed content includes a ``section_order`` key (set by the
+        NIM parser to reflect the original PDF layout), that order is used.
+        Otherwise falls back to :attr:`_SECTION_KEYS` canonical order.
 
         Args:
             resume_content: Resume content dict.
@@ -235,9 +259,46 @@ class StyleExtractor:
                 return bool(val)
             return True
 
-        non_empty_keys = {k for k, v in resume_content.items() if _is_non_empty(v)}
+        non_empty_keys = {k for k, v in resume_content.items()
+                         if _is_non_empty(v) and k != "section_order"}
 
-        ordered: List[str] = []
+        # Prefer explicit section order from the NIM parser
+        explicit_order = resume_content.get("section_order")
+        if isinstance(explicit_order, list) and explicit_order:
+            # NIM may return display names; normalise to snake_case keys
+            _DISPLAY_TO_KEY = {
+                "education": "education",
+                "work experience": "work_experience",
+                "experience": "work_experience",
+                "projects": "projects",
+                "skills": "skills",
+                "technical skills": "skills",
+                "certifications": "certifications",
+                "professional summary": "professional_summary",
+                "summary": "professional_summary",
+                "personal info": "personal_info",
+            }
+            normalised = []
+            for raw in explicit_order:
+                key = _DISPLAY_TO_KEY.get(raw.lower().strip(), raw.lower().strip().replace(" ", "_"))
+                if key not in normalised:
+                    normalised.append(key)
+
+            ordered: List[str] = []
+            # Always lead with personal_info if present
+            if "personal_info" in non_empty_keys:
+                ordered.append("personal_info")
+            for key in normalised:
+                if key in non_empty_keys and key not in ordered:
+                    ordered.append(key)
+            # Append any remaining non-empty keys not in explicit order
+            for key in self._SECTION_KEYS:
+                if key in non_empty_keys and key not in ordered:
+                    ordered.append(key)
+            return ordered
+
+        # Fallback: canonical order
+        ordered = []
         for key in self._SECTION_KEYS:
             if key in non_empty_keys:
                 ordered.append(key)
@@ -384,6 +445,9 @@ class StyleExtractor:
                 "capitalization": "upper",
                 "trailing_period": False,
             },
+            "font_family": "Helvetica",
+            "section_header_style": {"case": "title_colon", "rule": True},
+            "name_alignment": "left",
             "extracted_at": datetime.now(timezone.utc).isoformat(),
             "bullet_count": 0,
         }

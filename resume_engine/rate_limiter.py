@@ -1,26 +1,24 @@
 """
-Token-bucket rate limiter for the Gemini API.
+Token-bucket rate limiter for the NVIDIA NIM API.
 
-Gemini free-tier limits (2026):
-    gemini-2.5-flash:      10 RPM  /  250 RPD
-    gemini-2.5-flash-lite: 15 RPM  / 1000 RPD
+NVIDIA NIM limits (2026):
+    nvidia/llama-3.3-nemotron-super-49b-v1.5: 60 RPM / 5000 RPD
 
 Each model has its own :class:`RateLimiter` instance, identified by a
-``model_key`` (``"primary"`` or ``"bulk"``).  Both instances share the same
-JSON file (``data/gemini_usage.json``) but each writes to its own top-level key,
+``model_key`` (default ``"nvidia"``).  Instances share the same JSON file
+(``data/nvidia_usage.json``) but each writes to its own top-level key,
 so quota is preserved independently across process restarts.
 
 Usage::
 
-    primary = RateLimiter(rpm=10, rpd=250, model_key="primary")
-    bulk    = RateLimiter(rpm=15, rpd=1000, model_key="bulk")
+    limiter = RateLimiter(rpm=60, rpd=5000, model_key="nvidia")
 
-    with primary:           # blocks until a slot is available
-        response = call_primary_api(...)
+    with limiter:           # blocks until a slot is available
+        response = call_nvidia_api(...)
 
     # or as a decorator:
-    @bulk.guard
-    def call_bulk_api(...):
+    @limiter.guard
+    def call_api(...):
         ...
 """
 
@@ -35,10 +33,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_USAGE_FILE = Path("data") / "gemini_usage.json"
+_USAGE_FILE = Path("data") / "nvidia_usage.json"
+# Support legacy filename during transition
+_LEGACY_USAGE_FILE = Path("data") / "gemini_usage.json"
 
-# Default model key used when none is provided (backwards compat).
-_DEFAULT_KEY = "primary"
+# Default model key used when none is provided.
+_DEFAULT_KEY = "nvidia"
 
 
 class QuotaExceededError(Exception):
@@ -53,8 +53,7 @@ class RateLimiter:
         rpd: Maximum requests per day.
         usage_file: Path to the shared JSON file used to persist daily totals.
         model_key: Which top-level key to read/write in the JSON file.
-            Use ``"primary"`` for gemini-2.5-flash and ``"bulk"`` for
-            gemini-2.5-flash-lite.  Defaults to ``"primary"``.
+            Use ``"nvidia"`` for the Nemotron model.  Defaults to ``"nvidia"``.
 
     Attributes:
         rpm: Configured requests-per-minute ceiling.
@@ -160,7 +159,7 @@ class RateLimiter:
         remaining_pct = s["calls_remaining_today"] / self.rpd
         if remaining_pct <= threshold:
             logger.warning(
-                "Gemini API quota low for %s: %d calls remaining today (%.0f%% of %d).",
+                "NVIDIA NIM quota low for %s: %d calls remaining today (%.0f%% of %d).",
                 self.model_key,
                 s["calls_remaining_today"],
                 remaining_pct * 100,
@@ -216,7 +215,7 @@ class RateLimiter:
         self._maybe_reset_daily()
         if self._daily.get("calls", 0) >= self.rpd:
             raise QuotaExceededError(
-                f"Daily Gemini API quota of {self.rpd} requests exceeded for "
+                f"Daily NVIDIA NIM quota of {self.rpd} requests exceeded for "
                 f"model key '{self.model_key}'. Quota resets at midnight UTC."
             )
 
@@ -247,8 +246,12 @@ class RateLimiter:
     def _load_daily(self) -> dict:
         """Load the per-model section from the shared usage JSON file."""
         try:
-            if self._usage_file.exists():
-                with self._usage_file.open("r", encoding="utf-8") as fh:
+            # Try new file first; fall back to legacy gemini_usage.json (old installs)
+            active_file = self._usage_file
+            if not active_file.exists() and _LEGACY_USAGE_FILE.exists():
+                active_file = _LEGACY_USAGE_FILE
+            if active_file.exists():
+                with active_file.open("r", encoding="utf-8") as fh:
                     data = json.load(fh)
 
                 today = str(date.today())

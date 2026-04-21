@@ -281,6 +281,9 @@ class DatabaseManager:
         self._migrate_add_column_if_missing(
             "tailored_resumes", "score_breakdown", "JSON"
         )
+        self._migrate_add_column_if_missing(
+            "jobs", "match_score", "FLOAT"
+        )
         # Mark existing 'Master Resume v1' rows as sample if not already done.
         self._seed_sample_flag()
         # Seed one sample resume per industry from data/sample_resumes/.

@@ -194,16 +194,66 @@ async function openJobPanel(jobId) {
         ${prefSkills ? `<div class="panel-section-title" style="margin-top:8px">Preferred Skills</div><div class="panel-skills">${prefSkills}</div>` : ''}
       </div>` : ''}
 
+      <div id="gap-card-slot"></div>
+
       ${job.description ? `
       <div class="panel-section">
         <div class="panel-section-title">Description</div>
         <div class="panel-body-text">${_escHtml(job.description).slice(0, 1200)}${job.description.length > 1200 ? '…' : ''}</div>
       </div>` : ''}
     `;
+    if (job.status !== 'new') {
+      fetch(`/api/jobs/${job.id}/skill-gap`)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(gap) {
+          if (!gap || gap.error) return;
+          var slot = document.getElementById('gap-card-slot');
+          if (slot) slot.innerHTML = renderGapCard(gap);
+        })
+        .catch(function() {});
+    }
+
   } catch (e) {
     body.innerHTML = `<div class="panel-error">Error: ${_escHtml(e.message)}</div>`;
   }
 }
+
+function renderGapCard(gap) {
+  var pct = gap.match_percentage;
+  var barWidth = Math.round(pct);
+
+  var matchedTags = (gap.matched_skills || [])
+    .map(function(s) { return '<span class="skill-tag gap-matched">' + _escHtml(s) + '</span>'; })
+    .join('');
+  var missingReqTags = (gap.missing_required || [])
+    .map(function(s) { return '<span class="skill-tag gap-missing-req">' + _escHtml(s) + '</span>'; })
+    .join('');
+  var missingPrefTags = (gap.missing_preferred || [])
+    .map(function(s) { return '<span class="skill-tag gap-missing-pref">' + _escHtml(s) + '</span>'; })
+    .join('');
+
+  var askBtn = gap.has_gaps
+    ? '<button class="btn-gideon-gap" onclick="askGideonAboutGaps(' + gap.job_id + ')">Ask Gideon to help me learn these &rarr;</button>'
+    : '';
+
+  return '<div class="skill-gap-card">' +
+    '<div class="panel-section-title">Skill Gap Analysis</div>' +
+    '<div class="gap-progress">' +
+      '<span class="gap-progress-label">Required coverage</span>' +
+      '<div class="gap-progress-bar"><div class="gap-progress-fill" style="width:' + barWidth + '%"></div></div>' +
+      '<span class="gap-progress-pct">' + pct + '%</span>' +
+    '</div>' +
+    (matchedTags ? '<div class="gap-section"><span class="gap-label gap-label-matched">Skills you have (' + gap.matched_skills.length + ')</span><div class="gap-tags">' + matchedTags + '</div></div>' : '') +
+    (missingReqTags ? '<div class="gap-section"><span class="gap-label gap-label-missing">Missing required (' + gap.missing_required.length + ')</span><div class="gap-tags">' + missingReqTags + '</div></div>' : '') +
+    (missingPrefTags ? '<div class="gap-section"><span class="gap-label gap-label-preferred">Missing preferred (' + gap.missing_preferred.length + ')</span><div class="gap-tags">' + missingPrefTags + '</div></div>' : '') +
+    askBtn +
+  '</div>';
+}
+
+window.askGideonAboutGaps = function(jobId) {
+  var msg = encodeURIComponent('Help me learn the missing skills for job ' + jobId);
+  window.location.href = '/?prefill=' + msg;
+};
 
 function _scoreRow(label, component) {
   if (!component) return '';
@@ -233,7 +283,7 @@ async function generateResume(jobId, btn) {
     if (res.ok) {
       const msg = data.tailoring_applied
         ? 'Resume tailored! Match score: ' + (data.match_score || 0).toFixed(0) + '%'
-        : 'Resume saved — Gemini tailoring did not run. Check your API key or quota.';
+        : 'Resume saved — AI tailoring did not run. Check your API key or quota.';
       toast(msg, data.tailoring_applied ? 'success' : 'warning');
       openJobPanel(jobId);  // refresh panel
     } else if (res.status === 409 && data.error === 'resume_mismatch') {

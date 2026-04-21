@@ -262,15 +262,15 @@ class TestTailoringPipeline(unittest.TestCase):
         return job
 
     def _make_mocked_rewriter(self):
-        """Build a GeminiRewriter instance with _call_nvidia mocked."""
-        from resume_engine.gemini_rewriter import GeminiRewriter
+        """Build a Rewriter instance with _call_nvidia mocked."""
+        from resume_engine.rewriter import Rewriter
         from resume_engine.rate_limiter import RateLimiter
-        rw = GeminiRewriter.__new__(GeminiRewriter)
+        rw = Rewriter.__new__(Rewriter)
         limiter = RateLimiter(
             rpm=100, rpd=5_000,
             usage_file=Path(tempfile.mktemp(suffix=".json")),
         )
-        rw.model_id = "nvidia/llama-3.3-nemotron-super-49b-v1"
+        rw.model_id = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         rw._limiter = limiter
         rw._nvidia_limiter = limiter
         rw._max_retries = 1

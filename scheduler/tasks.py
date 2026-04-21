@@ -355,15 +355,25 @@ def analyze_new_jobs_task() -> TaskResult:
             new_jobs = db.query(Job).filter(Job.status == "new").all()
             logger.info("[analyze_new_jobs] Found %d job(s) to analyse.", len(new_jobs))
 
-            # Stamp each analyzed job with the currently active resume id.
+            # Load the active resume for stamping analyzed_with_resume_id and scoring.
+            active_resume = None
             active_resume_id: Optional[int] = None
             try:
                 from database.models import MasterResume as _MR
-                _ar = db.query(_MR).filter(_MR.is_active == True).first()
-                if _ar:
-                    active_resume_id = _ar.id
+                active_resume = db.query(_MR).filter(_MR.is_active == True).first()
+                if active_resume:
+                    active_resume_id = active_resume.id
             except Exception as _rexc:
                 logger.debug("[analyze_new_jobs] Could not resolve active resume: %s", _rexc)
+
+            # Scoring engine for computing match scores at analysis time.
+            scorer = None
+            if active_resume:
+                try:
+                    from analyzer.scoring import ScoringEngine
+                    scorer = ScoringEngine()
+                except Exception as _sexc:
+                    logger.debug("[analyze_new_jobs] Could not init ScoringEngine: %s", _sexc)
 
             for job in new_jobs:
                 if not job.job_description:
@@ -394,13 +404,25 @@ def analyze_new_jobs_task() -> TaskResult:
                             job.id, _det_exc,
                         )
 
+                    # Compute match score against active resume.
+                    if scorer and active_resume:
+                        try:
+                            score_result = scorer.score(job, active_resume)
+                            job.match_score = round(score_result.total_score, 1)
+                        except Exception as _score_exc:
+                            logger.debug(
+                                "[analyze_new_jobs] Scoring failed for job #%d: %s",
+                                job.id, _score_exc,
+                            )
+
                     logger.info(
-                        "[analyze_new_jobs] Job #%d (%s) – %d required, %d preferred, domain=%r.",
+                        "[analyze_new_jobs] Job #%d (%s) – %d required, %d preferred, domain=%r, score=%s.",
                         job.id,
                         _safe_text(job.job_title or ""),
                         len(extracted["required_skills"]),
                         len(extracted["preferred_skills"]),
                         job.domain,
+                        job.match_score,
                     )
 
                 except Exception as exc:

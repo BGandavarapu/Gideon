@@ -1,8 +1,8 @@
-"""Tests for StyleExtractor and style-aware Gemini rewriting.
+"""Tests for StyleExtractor and style-aware NIM rewriting.
 
 Covers:
 - StyleExtractor.extract() — all dimension detectors
-- GeminiRewriter.rewrite_bullet_point() — style constraint injection
+- Rewriter.rewrite_bullet_point() — style constraint injection
 - ResumeModifier._enforce_structure_order()
 - Flask upload route stores and returns style fingerprint
 - Flask generate-resume route passes style_fingerprint to modifier
@@ -354,11 +354,11 @@ class TestFormatDetection:
 
 
 # ---------------------------------------------------------------------------
-# GeminiRewriter style constraint injection tests
+# Rewriter style constraint injection tests
 # ---------------------------------------------------------------------------
 
 
-class TestGeminiRewriterStyleConstraints:
+class TestRewriterStyleConstraints:
     """Verify that style constraints are injected into / omitted from prompts."""
 
     STYLE_FINGERPRINT = {
@@ -373,9 +373,9 @@ class TestGeminiRewriterStyleConstraints:
     }
 
     def _make_rewriter(self):
-        from resume_engine.gemini_rewriter import GeminiRewriter, _NVIDIA_MODEL_ID
+        from resume_engine.rewriter import Rewriter, _NVIDIA_MODEL_ID
         from resume_engine.rate_limiter import RateLimiter
-        rw = GeminiRewriter.__new__(GeminiRewriter)
+        rw = Rewriter.__new__(Rewriter)
         rw.api_call_count = 0
         rw._max_retries = 1
         rw.model_id = _NVIDIA_MODEL_ID
@@ -528,7 +528,7 @@ class TestEnforceStructureOrder:
 
     def setup_method(self):
         from resume_engine.modifier import ResumeModifier
-        # Build a modifier without requiring a live Gemini key
+        # Build a modifier without requiring a live NVIDIA NIM key
         self.modifier = ResumeModifier.__new__(ResumeModifier)
 
     def test_order_matches_structure(self):

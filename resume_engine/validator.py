@@ -1,7 +1,7 @@
 """
 Content validator for AI-generated resume modifications.
 
-Ensures that Gemini's output is:
+Ensures that the NIM model's output is:
 
 1. **Truthful** – no numbers fabricated; metrics from original are preserved.
 2. **Professional** – no slang, no unprofessional superlatives.

@@ -68,6 +68,7 @@ class PDFGenerator:
         resume_data: Dict,
         template_name: str = "ats",
         filename: Optional[str] = None,
+        style_fingerprint: Optional[Dict] = None,
     ) -> str:
         """Generate a PDF resume and return the filesystem path.
 
@@ -102,7 +103,17 @@ class PDFGenerator:
         output_path = self._build_output_path(resume_data, template_name, filename)
 
         # -- generate --
-        template = _TEMPLATES[template_name]()
+        # If caller did not supply a fingerprint, fall back to style hints
+        # embedded on the resume_data itself (modifier copies font_family +
+        # section_header_style forward; style_extractor stores both on the
+        # master resume's fingerprint).
+        if style_fingerprint is None:
+            style_fingerprint = {
+                "font_family": resume_data.get("font_family"),
+                "section_header_style": resume_data.get("section_header_style"),
+                "format": resume_data.get("format"),
+            }
+        template = _TEMPLATES[template_name](style_fingerprint=style_fingerprint)
         try:
             template.generate_pdf(resume_data, output_path)
         except Exception as exc:
@@ -139,7 +150,7 @@ class PDFGenerator:
             RuntimeError: If PDF creation fails.
         """
         from database.database import get_db
-        from database.models import TailoredResume
+        from database.models import MasterResume, TailoredResume
 
         with get_db() as db:
             row = db.query(TailoredResume).filter(TailoredResume.id == tailored_resume_id).first()
@@ -147,7 +158,19 @@ class PDFGenerator:
                 raise LookupError(f"No TailoredResume found with id={tailored_resume_id}")
 
             resume_data: dict = row.tailored_content or {}
-            output_path = self.generate(resume_data, template_name, filename)
+
+            fingerprint = None
+            master = (
+                db.query(MasterResume)
+                .filter(MasterResume.id == row.master_resume_id)
+                .first()
+            )
+            if master and master.style_fingerprint:
+                fingerprint = master.style_fingerprint
+
+            output_path = self.generate(
+                resume_data, template_name, filename, style_fingerprint=fingerprint
+            )
 
             row.pdf_path = output_path
             db.commit()

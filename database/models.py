@@ -39,6 +39,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -123,6 +124,10 @@ class Job(Base):
         nullable=True,
         default=None,
     )
+
+    # Match score: computed at analysis time (resume skills vs job skills).
+    # NULL for jobs analyzed before this column was added.
+    match_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
 
     # Timestamps & status
     date_scraped: Mapped[datetime] = mapped_column(
@@ -291,7 +296,7 @@ class TailoredResume(Base):
     """An AI-generated resume variant tailored to a specific job.
 
     Each row links a :class:`MasterResume` to a :class:`Job` and stores
-    the Gemini-modified resume content, the match score calculated by the
+    the NIM-modified resume content, the match score calculated by the
     analyser, and the path to the generated PDF on disk.
 
     Attributes:
@@ -466,4 +471,269 @@ class Application(Base):
             "notes": self.notes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Chat persistence models
+# ---------------------------------------------------------------------------
+
+
+class ChatSession(Base):
+    """A single conversation between the user and Gideon."""
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    messages: Mapped[List["ChatMessage"]] = relationship(
+        "ChatMessage", back_populates="session",
+        order_by="ChatMessage.created_at",
+        cascade="all, delete-orphan",
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title or "New conversation",
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "message_count": self.message_count,
+        }
+
+
+class ChatMessage(Base):
+    """A single message within a chat session."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tool_calls_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tool_call_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    tool_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    actions_taken: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")
+
+    __table_args__ = (Index("ix_chat_messages_session_id", "session_id"),)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "role": self.role,
+            "content": self.content,
+            "tool_name": self.tool_name,
+            "actions_taken": self.actions_taken,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Assessment models
+# ---------------------------------------------------------------------------
+
+
+class SkillAssessment(Base):
+    """A skill assessment session — 10 questions generated and graded."""
+
+    __tablename__ = "skill_assessments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    skill: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="in_progress", server_default="in_progress",
+    )
+    current_question: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+    questions: Mapped[List["AssessmentQuestion"]] = relationship(
+        "AssessmentQuestion",
+        back_populates="assessment",
+        order_by="AssessmentQuestion.question_number",
+        cascade="all, delete-orphan",
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "skill": self.skill,
+            "status": self.status,
+            "current_question": self.current_question,
+            "score": self.score,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+class AssessmentQuestion(Base):
+    """A single question within a skill assessment."""
+
+    __tablename__ = "assessment_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("skill_assessments.id", ondelete="CASCADE"), nullable=False,
+    )
+    question_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    correct_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_correct: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    score_awarded: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    assessment: Mapped["SkillAssessment"] = relationship(
+        "SkillAssessment", back_populates="questions",
+    )
+
+    __table_args__ = (
+        Index("ix_assessment_questions_assessment_id", "assessment_id"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "assessment_id": self.assessment_id,
+            "question_number": self.question_number,
+            "question_type": self.question_type,
+            "question_text": self.question_text,
+            "options": self.options,
+            "correct_answer": self.correct_answer,
+            "user_answer": self.user_answer,
+            "is_correct": self.is_correct,
+            "score_awarded": self.score_awarded,
+            "feedback": self.feedback,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Interview Prep models
+# ---------------------------------------------------------------------------
+
+
+class InterviewSession(Base):
+    """A job-specific interview prep session — 15 questions, browse or mock mode."""
+
+    __tablename__ = "interview_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    job_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="in_progress", server_default="in_progress",
+    )
+    current_question: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    hiring_recommendation: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+    questions: Mapped[List["InterviewQuestion"]] = relationship(
+        "InterviewQuestion",
+        back_populates="interview_session",
+        order_by="InterviewQuestion.question_number",
+        cascade="all, delete-orphan",
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "job_id": self.job_id,
+            "mode": self.mode,
+            "status": self.status,
+            "current_question": self.current_question,
+            "score": self.score,
+            "hiring_recommendation": self.hiring_recommendation,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+class InterviewQuestion(Base):
+    """A single question within an interview prep session."""
+
+    __tablename__ = "interview_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    interview_session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    question_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    model_answer_tips: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feedback_strengths: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feedback_gaps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feedback_suggestion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    score_awarded: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    interview_session: Mapped["InterviewSession"] = relationship(
+        "InterviewSession", back_populates="questions",
+    )
+
+    __table_args__ = (
+        Index("ix_interview_questions_session_id", "interview_session_id"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "interview_session_id": self.interview_session_id,
+            "question_number": self.question_number,
+            "question_type": self.question_type,
+            "question_text": self.question_text,
+            "category": self.category,
+            "model_answer_tips": self.model_answer_tips,
+            "user_answer": self.user_answer,
+            "feedback_strengths": self.feedback_strengths,
+            "feedback_gaps": self.feedback_gaps,
+            "feedback_suggestion": self.feedback_suggestion,
+            "score_awarded": self.score_awarded,
         }

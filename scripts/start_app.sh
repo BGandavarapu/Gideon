@@ -1,5 +1,5 @@
 #!/bin/bash
-# Resume Auto-Tailor — clean start script (Unix/macOS bash)
+# Gideon — clean start script (Unix/macOS bash)
 # Kills any process using port 5001 before starting Flask.
 # Usage: ./scripts/start_app.sh
 #        PORT=5000 ./scripts/start_app.sh   (if you need a different port)

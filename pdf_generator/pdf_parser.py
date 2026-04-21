@@ -2,24 +2,27 @@
 
 Uses ``pdfminer.six`` for PDF text extraction, ``python-docx`` for DOCX, and
 plain UTF-8 decoding for TXT. Structured content extraction is performed first
-via NVIDIA NIM (``nvidia/llama-3.3-nemotron-super-49b-v1``), falling back to
+via NVIDIA NIM (``nvidia/llama-3.3-nemotron-super-49b-v1.5``), falling back to
 heuristic section parsers when the API is unavailable.
 
 The result is a dict compatible with the MasterResume.content JSON schema::
 
     {
-        "personal_info": {"name": ..., "email": ..., "phone": ..., "location": ...},
+        "personal_info": {"name": ..., "email": ..., "phone": ...,
+                          "location": ..., "linkedin": ..., "github": ...},
         "professional_summary": "...",
         "skills": [...],
-        "work_experience": [...],
-        "education": [...],
-        "projects": [],
+        "work_experience": [{"title": ..., "company": ..., "location": ...,
+                             "dates": ..., "bullets": [...]}],
+        "education": [{"degree": ..., "institution": ..., "year": ..., "gpa": ...}],
+        "certifications": [...],
+        "projects": [{"name": ..., "description": ..., "technologies": [...]}],
     }
 
 Before parsing, :class:`ResumeClassifier` runs a two-stage check:
 
 1. **Heuristic** – fast pattern matching, no API call.
-2. **NVIDIA NIM** – ``nvidia/llama-3.3-nemotron-super-49b-v1`` for inconclusive docs.
+2. **NVIDIA NIM** – ``nvidia/llama-3.3-nemotron-super-49b-v1.5`` for inconclusive docs.
 
 Non-resume documents (invoices, research papers, contracts, …) raise
 :class:`NotAResumeError` before any expensive parse call is made.
@@ -40,13 +43,20 @@ _EMAIL_RE    = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 _PHONE_RE    = re.compile(
     r"(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})"
 )
+_LINKEDIN_RE = re.compile(r"linkedin\.com/in/[\w-]+", re.IGNORECASE)
+_GITHUB_RE   = re.compile(r"github\.com/[\w-]+", re.IGNORECASE)
 _SECTION_RE  = re.compile(
-    r"^(SUMMARY|EXPERIENCE|EDUCATION|SKILLS|PROJECTS|CERTIFICATIONS|"
-    r"OBJECTIVE|PROFILE|WORK HISTORY)\b",
+    r"^(SUMMARY|PROFESSIONAL SUMMARY|EXECUTIVE SUMMARY|CAREER SUMMARY|"
+    r"EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EMPLOYMENT|EMPLOYMENT HISTORY|WORK HISTORY|"
+    r"EDUCATION|ACADEMIC BACKGROUND|"
+    r"SKILLS|TECHNICAL SKILLS|CORE COMPETENCIES|TECHNOLOGIES|KEY SKILLS|AREAS OF EXPERTISE|"
+    r"PROJECTS|KEY PROJECTS|PERSONAL PROJECTS|"
+    r"CERTIFICATIONS|CERTIFICATES|LICENSES|"
+    r"OBJECTIVE|PROFILE|CAREER OBJECTIVE)\b",
     re.IGNORECASE,
 )
 
-_NVIDIA_MODEL_ID = "nvidia/llama-3.3-nemotron-super-49b-v1"
+_NVIDIA_MODEL_ID = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
 _NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
 
@@ -366,8 +376,14 @@ class ResumePDFParser:
         """
         ext = file_extension.lower().lstrip(".")
 
+        font_family = "Helvetica"
+        detected_bullet = "none"
+        name_alignment = "left"
         if ext == "pdf":
             text = self._extract_text(file_bytes)
+            font_family = self._detect_font_family(file_bytes)
+            detected_bullet = self._detect_bullet_char(file_bytes)
+            name_alignment = self._detect_name_alignment(file_bytes)
         elif ext == "docx":
             text = self._extract_text_from_docx(file_bytes)
         elif ext == "txt":
@@ -379,6 +395,11 @@ class ResumePDFParser:
 
         if not text.strip():
             raise ValueError("Could not extract text from file. Is it a scanned image or empty?")
+
+        logger.info(
+            "Extracted %d chars from .%s file. Preview: %.200r",
+            len(text), ext, text[:200],
+        )
 
         # -- Classification gate --
         classifier = ResumeClassifier()
@@ -407,8 +428,15 @@ class ResumePDFParser:
         # -- Try NVIDIA NIM structured parsing first --
         result = self._parse_with_nvidia(text)
 
+        # If NIM returned but with empty skills AND experience, discard it.
+        # `skills` may be a dict (categorised) or a list — both are truthy when populated.
+        if result and not result.get("skills") and not result.get("work_experience"):
+            logger.warning("NIM parse returned empty skills and experience — falling back to heuristic.")
+            result = None
+
         if not result:
             # Fall back to heuristic section parsers
+            logger.info("Using heuristic section parsers for resume extraction.")
             lines = [l.rstrip() for l in text.splitlines()]
             result = {
                 "personal_info":        self._parse_personal_info(lines),
@@ -416,7 +444,8 @@ class ResumePDFParser:
                 "skills":               self._parse_skills(lines),
                 "work_experience":      self._parse_experience(lines),
                 "education":            self._parse_education(lines),
-                "projects":             [],
+                "certifications":       self._parse_certifications(lines),
+                "projects":             self._parse_projects(lines),
             }
 
         # Ensure all expected keys are present with safe defaults
@@ -425,13 +454,26 @@ class ResumePDFParser:
         result.setdefault("skills", [])
         result.setdefault("work_experience", [])
         result.setdefault("education", [])
+        result.setdefault("certifications", [])
         result.setdefault("projects", [])
+        result.setdefault("section_header_style", {"case": "title_colon", "rule": True})
+
+        # Normalize field names to canonical schema
+        result = self._normalize_parsed_result(result)
+
+        # Attach detected font family so the style fingerprint can carry it
+        # downstream to the PDF generator.
+        result["font_family"] = font_family
+        result["detected_bullet_char"] = detected_bullet
+        result["name_alignment"] = name_alignment
 
         logger.info(
-            "Resume parsed: name=%r, skills=%d, experience=%d",
+            "Resume parsed: name=%r, skills=%d, experience=%d, certs=%d, projects=%d",
             result["personal_info"].get("name", "?"),
             len(result["skills"]),
             len(result["work_experience"]),
+            len(result["certifications"]),
+            len(result["projects"]),
         )
         return result
 
@@ -446,10 +488,134 @@ class ResumePDFParser:
             from pdfminer.high_level import extract_text as _extract  # type: ignore
             return _extract(io.BytesIO(pdf_bytes))
         except ImportError:
-            logger.warning("pdfminer.six not installed — falling back to basic extraction")
-            return pdf_bytes.decode("latin-1", errors="replace")
+            raise ValueError(
+                "pdfminer.six is required for PDF parsing. "
+                "Install it with: pip install pdfminer.six"
+            )
         except Exception as exc:
             raise ValueError(f"PDF extraction failed: {exc}") from exc
+
+    @staticmethod
+    def _detect_font_family(pdf_bytes: bytes) -> str:
+        """Detect the dominant font family from a PDF's body text.
+
+        Walks pdfminer's layout tree, weights each LTChar by count, and
+        returns one of ReportLab's built-in families: ``"Times"``,
+        ``"Helvetica"``, or ``"Courier"``. Returns ``"Helvetica"`` on any
+        error (safe default matching the existing pipeline).
+        """
+        try:
+            from pdfminer.high_level import extract_pages  # type: ignore
+            from pdfminer.layout import LTChar, LTTextContainer  # type: ignore
+        except ImportError:
+            return "Helvetica"
+
+        times_markers = ("times", "serif", "roman", "garamond", "georgia",
+                         "cambria", "bookman", "palatino")
+        courier_markers = ("mono", "courier", "consolas", "inconsolata", "menlo")
+
+        times_chars = 0
+        courier_chars = 0
+        helvetica_chars = 0
+
+        def _count_char(obj):
+            nonlocal times_chars, courier_chars, helvetica_chars
+            if isinstance(obj, LTChar):
+                name = (obj.fontname or "").lower()
+                if any(m in name for m in times_markers):
+                    times_chars += 1
+                elif any(m in name for m in courier_markers):
+                    courier_chars += 1
+                else:
+                    helvetica_chars += 1
+            elif hasattr(obj, "__iter__"):
+                for child in obj:
+                    _count_char(child)
+
+        try:
+            for page in extract_pages(io.BytesIO(pdf_bytes)):
+                for element in page:
+                    if not isinstance(element, LTTextContainer):
+                        continue
+                    _count_char(element)
+                total = times_chars + courier_chars + helvetica_chars
+                if total > 500:
+                    break
+        except Exception as exc:
+            logger.debug("Font detection failed: %s", exc)
+            return "Helvetica"
+
+        total = times_chars + courier_chars + helvetica_chars
+        if total == 0:
+            return "Helvetica"
+
+        # Winner-takes-all
+        if times_chars >= helvetica_chars and times_chars >= courier_chars:
+            return "Times"
+        if courier_chars >= helvetica_chars:
+            return "Courier"
+        return "Helvetica"
+
+    @staticmethod
+    def _detect_bullet_char(pdf_bytes: bytes) -> str:
+        """Detect the dominant bullet character from the raw PDF text.
+
+        Scans each line for a leading special character from a known set of
+        bullet markers. Returns the most common one, or ``"none"`` if no
+        bullet characters are found.
+        """
+        _KNOWN_BULLETS = frozenset("●•○◦■□▪▸►➤-*—–")
+
+        try:
+            from pdfminer.high_level import extract_text  # type: ignore
+
+            text = extract_text(io.BytesIO(pdf_bytes), maxpages=3)
+        except Exception:
+            return "none"
+
+        counts: dict[str, int] = {}
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if len(stripped) < 3:
+                continue
+            first = stripped[0]
+            if first in _KNOWN_BULLETS and stripped[1] in (" ", "\t"):
+                counts[first] = counts.get(first, 0) + 1
+
+        if not counts:
+            return "none"
+        return max(counts, key=counts.get)
+
+    @staticmethod
+    def _detect_name_alignment(pdf_bytes: bytes) -> str:
+        """Detect whether the candidate's name is centered or left-aligned.
+
+        Uses pdfminer to find the first text element on the first page and
+        compares its horizontal midpoint to the page center.  Returns
+        ``"center"`` or ``"left"``.
+        """
+        try:
+            from pdfminer.high_level import extract_pages  # type: ignore
+            from pdfminer.layout import LTTextBoxHorizontal  # type: ignore
+
+            for page in extract_pages(io.BytesIO(pdf_bytes), maxpages=1):
+                page_width = page.width
+                page_center = page_width / 2.0
+                tolerance = page_width * 0.15
+
+                for element in page:
+                    if not isinstance(element, LTTextBoxHorizontal):
+                        continue
+                    text = element.get_text().strip()
+                    if not text or len(text) < 2:
+                        continue
+                    elem_mid = (element.x0 + element.x1) / 2.0
+                    if abs(elem_mid - page_center) < tolerance:
+                        return "center"
+                    return "left"
+        except Exception:
+            pass
+        return "left"
 
     @staticmethod
     def _extract_text_from_docx(file_bytes: bytes) -> str:
@@ -487,32 +653,85 @@ class ResumePDFParser:
         if not api_key:
             return None
 
-        # Cap at ~6000 chars to stay within token limits
-        snippet = text[:6000]
-        prompt = (
-            "You are a resume parser. Extract structured data from the resume text below.\n\n"
-            "Return ONLY a JSON object with this exact structure (no markdown, no extra text):\n"
+        # Cap input to stay within token limits (15k chars ≈ 3.75k tokens)
+        snippet = text[:15000]
+
+        system_msg = (
+            "You are a precise resume parser. You extract structured data from resume text "
+            "and return ONLY valid JSON — no markdown fences, no explanation, no preamble.\n\n"
+            "Return a JSON object with this exact structure:\n"
             "{\n"
-            '  "personal_info": {"name": "", "email": "", "phone": "", "location": ""},\n'
+            '  "personal_info": {"name": "", "email": "", "phone": "", "location": "", "linkedin": "", "github": ""},\n'
             '  "professional_summary": "",\n'
-            '  "skills": ["skill1", "skill2"],\n'
+            '  "skills": {"Category Name": ["skill1", "skill2"]},\n'
             '  "work_experience": [\n'
             '    {"title": "", "company": "", "location": "", '
-            '"start_date": "", "end_date": "", "bullets": ["..."]}\n'
+            '"dates": "", "bullets": ["..."]}\n'
             '  ],\n'
             '  "education": [\n'
-            '    {"degree": "", "institution": "", "graduation_year": "", "gpa": ""}\n'
+            '    {"degree": "", "institution": "", "location": "", '
+            '"year": "", "gpa": "", "coursework": ""}\n'
             '  ],\n'
+            '  "certifications": ["cert1"],\n'
             '  "projects": [\n'
-            '    {"name": "", "description": "", "technologies": ["..."]}\n'
-            '  ]\n'
+            '    {"name": "", "date": "", "bullets": ["..."], "technologies": ["..."]}\n'
+            '  ],\n'
+            '  "section_order": ["education", "work_experience", "projects", "skills"],\n'
+            '  "section_header_style": {"case": "title_colon", "rule": true}\n'
             "}\n\n"
-            "Rules:\n"
-            "- Extract ALL skills listed anywhere in the resume (technical, soft, tools, languages)\n"
-            "- Each work experience entry must include all bullet points verbatim\n"
-            "- If a field is not found, use empty string or empty list\n"
-            "- Do not hallucinate data not present in the text\n\n"
-            f"Resume text:\n{snippet}"
+            "CRITICAL RULES — violating any of these is wrong:\n"
+            "\n"
+            "SKILLS:\n"
+            "- Extract ALL skills mentioned anywhere in the resume.\n"
+            "- If the resume organizes skills into labeled categories like 'Programming Languages:', "
+            "'Frameworks and Libraries:', 'Tools:', 'Databases:' — you MUST preserve them as a JSON "
+            "object where each key is the EXACT category label (without the trailing colon) and each "
+            "value is an array of the skills listed under it. Example: "
+            '{"Programming Languages": ["Python", "Java"], "Frameworks and Libraries": ["React", "Flask"]}.\n'
+            "- Only use a flat array when the resume has a single uncategorized skills list.\n"
+            "\n"
+            "WORK EXPERIENCE:\n"
+            "- Each entry must include EVERY bullet point under it verbatim in the bullets array — "
+            "never collapse bullets into a single paragraph.\n"
+            '- Combine start and end dates into one string (e.g. "May 2023 - August 2023" or "2022 - Present").\n'
+            "\n"
+            "PROJECTS:\n"
+            "- EVERY line that starts with a bullet character (•, -, *, ●) under a project name MUST "
+            "go into that project's bullets array. NEVER collapse them into a description paragraph.\n"
+            "- If a project has no bulleted lines but has descriptive sentences, put each sentence as "
+            "its own entry in the bullets array.\n"
+            '- For project date, extract the date or timeframe if present (e.g. "March 2023").\n'
+            "\n"
+            "EDUCATION:\n"
+            '- The `year` field MUST be the FULL date range as it appears in the PDF '
+            '(e.g. "August 2024 - May 2026"), NOT just the end year.\n'
+            "- Extract the city/state into `location` if present (e.g. \"Tempe, AZ\").\n"
+            "- `coursework` MUST be populated if the resume has a 'Relevant Coursework' or similar "
+            "label — extract every comma-separated item verbatim as one string.\n"
+            "\n"
+            "PERSONAL INFO:\n"
+            "- Scan the first 15 lines for any URL matching `linkedin.com/in/<handle>` or "
+            "`github.com/<handle>` — these MUST be captured into the linkedin / github fields "
+            "even if they appear as hyperlinks or without an https:// prefix.\n"
+            "\n"
+            "SUMMARY / CERTIFICATIONS:\n"
+            "- Extract the summary/objective paragraph into professional_summary if present.\n"
+            "- Extract all certifications, licenses, and certificates into the certifications array.\n"
+            "\n"
+            "SECTION ORDER & HEADER STYLE:\n"
+            "- section_order: list the sections IN THE EXACT ORDER THEY APPEAR in the resume, using "
+            "these keys: professional_summary, education, work_experience, skills, projects, certifications. "
+            "Omit sections that don't exist.\n"
+            "- section_header_style.case: use \"title_colon\" if headers look like "
+            "'Education:' or 'Work Experience:' (title case with trailing colon); use \"upper\" if "
+            "headers are ALL CAPS like 'EDUCATION' / 'WORK EXPERIENCE'; use \"title\" if title case with "
+            "no colon. Default to \"title_colon\" if unclear.\n"
+            "- section_header_style.rule: true if the original has a thin horizontal line under each "
+            "section header, false otherwise. Default to true.\n"
+            "\n"
+            "GENERAL:\n"
+            "- If a field is not found, use an empty string or empty list/object.\n"
+            "- Do NOT hallucinate data not present in the text."
         )
 
         try:
@@ -520,9 +739,12 @@ class ResumePDFParser:
             client = _OpenAI(base_url=_NVIDIA_BASE_URL, api_key=api_key)
             response = client.chat.completions.create(
                 model=_NVIDIA_MODEL_ID,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": f"Parse this resume:\n\n{snippet}"},
+                ],
                 temperature=0.1,
-                max_tokens=2048,
+                max_tokens=8192,
             )
             raw = (response.choices[0].message.content or "").strip()
             # Strip markdown code fences if present
@@ -543,12 +765,71 @@ class ResumePDFParser:
         return None
 
     # ------------------------------------------------------------------
+    # Post-processing normalization
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _normalize_parsed_result(result: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize field names so output always matches the canonical schema.
+
+        Handles mismatches between NIM output, heuristic output, and the
+        canonical sample resume format used by templates and the modifier.
+        """
+        # --- personal_info: ensure linkedin/github keys ---
+        pi = result.get("personal_info", {})
+        pi.setdefault("name", "")
+        pi.setdefault("email", "")
+        pi.setdefault("phone", "")
+        pi.setdefault("location", "")
+        pi.setdefault("linkedin", "")
+        pi.setdefault("github", "")
+        result["personal_info"] = pi
+
+        # --- work_experience: start_date/end_date → dates ---
+        for job in result.get("work_experience", []):
+            if "dates" not in job or not job["dates"]:
+                sd = job.pop("start_date", "")
+                ed = job.pop("end_date", "")
+                if sd or ed:
+                    job["dates"] = f"{sd} - {ed}".strip(" -")
+                else:
+                    job["dates"] = ""
+            else:
+                job.pop("start_date", None)
+                job.pop("end_date", None)
+
+        # --- education: school → institution, graduation_year → year ---
+        for edu in result.get("education", []):
+            if "institution" not in edu and "school" in edu:
+                edu["institution"] = edu.pop("school")
+            if "year" not in edu and "graduation_year" in edu:
+                edu["year"] = edu.pop("graduation_year")
+            edu.setdefault("institution", "")
+            edu.setdefault("year", "")
+            edu.setdefault("location", "")
+            edu.setdefault("coursework", "")
+
+        # --- projects: ensure bullets/date keys ---
+        for proj in result.get("projects", []):
+            proj.setdefault("bullets", [])
+            proj.setdefault("date", "")
+            proj.setdefault("technologies", [])
+            # If description exists but bullets is empty, keep description as-is
+            # Templates will fall back to description when bullets is empty
+
+        # --- certifications: ensure key exists ---
+        result.setdefault("certifications", [])
+
+        return result
+
+    # ------------------------------------------------------------------
     # Heuristic section parsers (fallback)
     # ------------------------------------------------------------------
 
     def _parse_personal_info(self, lines: List[str]) -> Dict[str, str]:
         info: Dict[str, str] = {
-            "name": "", "email": "", "phone": "", "location": ""
+            "name": "", "email": "", "phone": "", "location": "",
+            "linkedin": "", "github": "",
         }
         # Name: first non-empty line is usually the name
         for line in lines[:10]:
@@ -565,6 +846,14 @@ class ResumePDFParser:
         if m:
             info["phone"] = m.group(1).strip()
 
+        # LinkedIn / GitHub
+        m = _LINKEDIN_RE.search(full_text)
+        if m:
+            info["linkedin"] = m.group(0)
+        m = _GITHUB_RE.search(full_text)
+        if m:
+            info["github"] = m.group(0)
+
         # Location: line with "City, ST" or "City, Country" pattern
         loc_re = re.compile(r"([A-Z][a-zA-Z ]+,\s*[A-Z]{2,})")
         for line in lines[:20]:
@@ -580,7 +869,7 @@ class ResumePDFParser:
         buf: List[str] = []
         for line in lines:
             upper = line.strip().upper()
-            if re.match(r"^(SUMMARY|OBJECTIVE|PROFILE|PROFESSIONAL SUMMARY)\b", upper):
+            if re.match(r"^(SUMMARY|OBJECTIVE|PROFILE|PROFESSIONAL SUMMARY|EXECUTIVE SUMMARY|CAREER SUMMARY|CAREER OBJECTIVE|ABOUT ME)\b", upper):
                 in_section = True
                 continue
             if in_section:
@@ -598,7 +887,7 @@ class ResumePDFParser:
 
         for line in lines:
             upper = line.strip().upper()
-            if re.match(r"^SKILLS?\b", upper):
+            if re.match(r"^(SKILLS?|TECHNICAL SKILLS|CORE COMPETENCIES|TECHNOLOGIES|KEY SKILLS|AREAS OF EXPERTISE|TOOLS & TECHNOLOGIES)\b", upper):
                 in_section = True
                 continue
             if in_section:
@@ -640,7 +929,7 @@ class ResumePDFParser:
             stripped = line.strip()
             upper = stripped.upper()
 
-            if re.match(r"^(EXPERIENCE|WORK HISTORY|WORK EXPERIENCE)\b", upper):
+            if re.match(r"^(EXPERIENCE|WORK HISTORY|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EMPLOYMENT|EMPLOYMENT HISTORY)\b", upper):
                 in_section = True
                 continue
 
@@ -704,9 +993,9 @@ class ResumePDFParser:
                 if m:
                     if current:
                         schools.append(current)
-                    current = {"degree": stripped, "school": "", "year": ""}
-                elif current and not current["school"]:
-                    current["school"] = stripped
+                    current = {"degree": stripped, "institution": "", "year": ""}
+                elif current and not current["institution"]:
+                    current["institution"] = stripped
                 elif current and not current["year"]:
                     year_m = re.search(r"\b(19|20)\d{2}\b", stripped)
                     if year_m:
@@ -715,3 +1004,65 @@ class ResumePDFParser:
         if current:
             schools.append(current)
         return schools
+
+    def _parse_certifications(self, lines: List[str]) -> List[str]:
+        in_section = False
+        certs: List[str] = []
+
+        for line in lines:
+            upper = line.strip().upper()
+            if re.match(r"^(CERTIFICATIONS?|CERTIFICATES?|LICENSES?)\b", upper):
+                in_section = True
+                continue
+            if in_section:
+                stripped = line.strip()
+                if _SECTION_RE.match(stripped) and certs:
+                    break
+                if stripped:
+                    # Strip bullet characters
+                    clean = stripped.lstrip("•-*· ")
+                    if clean:
+                        certs.append(clean)
+        return certs
+
+    def _parse_projects(self, lines: List[str]) -> List[Dict[str, Any]]:
+        in_section = False
+        projects: List[Dict[str, Any]] = []
+        current: Dict[str, Any] | None = None
+
+        for line in lines:
+            stripped = line.strip()
+            upper = stripped.upper()
+
+            if re.match(r"^(PROJECTS|KEY PROJECTS|PERSONAL PROJECTS)\b", upper):
+                in_section = True
+                continue
+
+            if in_section:
+                if _SECTION_RE.match(stripped) and stripped.upper() not in (
+                    "PROJECTS", "KEY PROJECTS", "PERSONAL PROJECTS"
+                ):
+                    if current:
+                        projects.append(current)
+                    break
+
+                if not stripped:
+                    continue
+
+                # A short line (< 60 chars) without bullet chars is likely a project name
+                is_bullet = stripped[0] in "•-*·"
+                if not is_bullet and len(stripped) < 60 and current is not None:
+                    projects.append(current)
+                    current = {"name": stripped, "description": "", "technologies": []}
+                elif current is None:
+                    current = {"name": stripped, "description": "", "technologies": []}
+                elif current:
+                    desc_line = stripped.lstrip("•-*· ")
+                    if current["description"]:
+                        current["description"] += " " + desc_line
+                    else:
+                        current["description"] = desc_line
+
+        if current:
+            projects.append(current)
+        return projects

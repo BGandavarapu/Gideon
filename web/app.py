@@ -1,4 +1,4 @@
-"""Flask web application for the Gideon dashboard.
+"""Flask web application for the Resume Auto-Tailor dashboard.
 
 Provides a Linear-inspired UI for browsing jobs, viewing resumes, and
 triggering resume generation / PDF export.
@@ -29,13 +29,6 @@ _START_PID: int = os.getpid()
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
-
-# Load .env before any module that reads env vars (NVIDIA_API_KEY, etc.)
-try:
-    from dotenv import load_dotenv as _load_dotenv
-    _load_dotenv(_ROOT / ".env")
-except ImportError:
-    pass
 
 from flask import Flask, jsonify, render_template, request, send_file
 from flask_cors import CORS
@@ -233,20 +226,24 @@ def api_job_detail(job_id):
         )
         apps = db.query(Application).filter(Application.job_id == job_id).all()
 
-    # Return the score_breakdown stored at generation time (consistent with match_score).
-    score_breakdown = tailored.score_breakdown if tailored else None
-
-    # Resolve the name of the resume used to analyze this job (display only)
-    analyzed_resume_name = None
-    if job.analyzed_with_resume_id:
+    # Compute a live score_breakdown if there is a tailored resume.
+    # We never modify stored match_score — this is display-only.
+    score_breakdown = None
+    if tailored:
         try:
-            with get_db() as _dbr:
-                _ar = _dbr.query(MasterResume).filter(
-                    MasterResume.id == job.analyzed_with_resume_id
-                ).first()
-                analyzed_resume_name = _ar.name if _ar else None
-        except Exception:
-            pass
+            from analyzer.scoring import ScoringEngine
+            active_resume = None
+            with get_db() as _db:
+                active_resume = (
+                    _db.query(MasterResume)
+                    .filter(MasterResume.is_active == True)
+                    .first()
+                )
+            if active_resume:
+                _result = ScoringEngine().score(job, active_resume)
+                score_breakdown = _result.score_breakdown
+        except Exception as _exc:
+            logger.debug("score_breakdown computation skipped: %s", _exc)
 
     return jsonify({
         "id":               job.id,
@@ -268,9 +265,7 @@ def api_job_detail(job_id):
             "generated_at": tailored.generated_at.strftime("%b %d, %Y") if tailored.generated_at else "",
             "pdf_path":     tailored.pdf_path,
         } if tailored else None,
-        "score_breakdown":           score_breakdown,
-        "analyzed_with_resume_id":   job.analyzed_with_resume_id,
-        "analyzed_with_resume_name": analyzed_resume_name,
+        "score_breakdown": score_breakdown,
         "applications": [
             {"id": a.id, "status": a.status, "date": a.application_date.isoformat() if a.application_date else None}
             for a in apps
@@ -282,7 +277,7 @@ def api_job_detail(job_id):
 def api_update_job_status(job_id):
     payload = request.get_json(silent=True) or {}
     new_status = payload.get("status", "").strip()
-    allowed = {"applied", "archived"}
+    allowed = {"new", "analyzed", "applied", "archived"}
     if new_status not in allowed:
         return jsonify({"error": f"status must be one of {sorted(allowed)}"}), 400
 
@@ -294,90 +289,6 @@ def api_update_job_status(job_id):
         db.commit()
 
     return jsonify({"ok": True, "status": new_status})
-
-
-@app.route("/api/jobs/<int:job_id>/reanalyze", methods=["POST"])
-def api_reanalyze_job(job_id: int):
-    """Re-extract skills for a job using the currently active resume.
-
-    Updates ``required_skills``, ``preferred_skills``, ``analyzed_with_resume_id``,
-    and optionally ``domain``.  Does NOT delete existing tailored resumes.
-    """
-    try:
-        from analyzer.keyword_extractor import KeywordExtractor
-        from analyzer.scoring import ScoringEngine
-
-        with get_db() as db:
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if not job:
-                return jsonify({"error": "Job not found"}), 404
-            if not job.job_description:
-                return jsonify({"error": "Job has no description to analyze"}), 400
-
-            master = (
-                db.query(MasterResume)
-                .filter(MasterResume.is_active == True)
-                .first()
-            )
-            if not master:
-                return jsonify({"error": "No active master resume found"}), 400
-
-            extractor = KeywordExtractor()
-            extracted = extractor.extract(job.job_description)
-
-            job.required_skills = extracted["required_skills"] or None
-            job.preferred_skills = extracted["preferred_skills"] or None
-            job.status = "analyzed"
-            job.analyzed_with_resume_id = master.id
-
-            # Optional domain refinement (mirrors analyze_new_jobs_task)
-            try:
-                from analyzer.domain_detector import DomainDetector
-                detected = DomainDetector().detect_from_job(job)
-                job.domain = detected.get("domain", job.domain)
-            except Exception:
-                pass
-
-            score_result = ScoringEngine().score(job, master)
-
-        return jsonify({
-            "ok":                        True,
-            "required_skills_count":     len(job.required_skills or []),
-            "preferred_skills_count":    len(job.preferred_skills or []),
-            "match_score":               round(score_result.total_score, 1),
-            "analyzed_with_resume_id":   master.id,
-            "analyzed_with_resume_name": master.name,
-        })
-
-    except Exception as exc:
-        logger.exception("Reanalysis failed for job %s", job_id)
-        return jsonify({"error": str(exc)}), 500
-
-
-@app.route("/api/jobs/reanalyze-all", methods=["POST"])
-def api_reanalyze_all_jobs():
-    """Reset all analyzed jobs to 'new' so they get re-analyzed with the improved extractor.
-
-    Clears ``required_skills``, ``preferred_skills``, and ``analyzed_with_resume_id`` for
-    every job, then sets ``status = 'new'`` so the next Analyze Jobs run processes them.
-
-    Does NOT delete tailored resumes — existing generated resumes are kept.
-    """
-    try:
-        with get_db() as db:
-            jobs = db.query(Job).filter(Job.status == "analyzed").all()
-            count = len(jobs)
-            for job in jobs:
-                job.status = "new"
-                job.required_skills = None
-                job.preferred_skills = None
-                job.analyzed_with_resume_id = None
-            db.commit()
-
-        return jsonify({"ok": True, "jobs_reset": count,
-                        "message": f"Reset {count} jobs to 'new'. Run Analyze Jobs to re-extract skills."})
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +312,6 @@ def api_master_resumes():
                 "is_active": bool(d.get("is_active")),
                 "is_sample": bool(d.get("is_sample")),
                 "domain": d.get("domain"),
-                "domains": m.domains or ([m.domain] if m.domain else []),
                 "created_at": m.created_at.strftime("%b %d, %Y") if m.created_at else "",
                 "sections": list(content.keys()) if content else [],
             }
@@ -488,12 +398,6 @@ def api_generate_resume():
             if not job:
                 return jsonify({"error": "Job not found"}), 404
 
-            if job.status == "new":
-                return jsonify({
-                    "error": "not_analyzed",
-                    "message": "This job has not been analyzed yet. Run Analyze Jobs first.",
-                }), 422
-
             master = (
                 db.query(MasterResume)
                 .filter(MasterResume.is_active == True)
@@ -501,21 +405,6 @@ def api_generate_resume():
             )
             if not master:
                 return jsonify({"error": "No active master resume found"}), 400
-
-            # Block generation when the job was analyzed with a different resume.
-            # NULL analyzed_with_resume_id means old job (pre-feature) — allow it.
-            if (job.analyzed_with_resume_id is not None
-                    and job.analyzed_with_resume_id != master.id):
-                analyzed_with = db.query(MasterResume).filter(
-                    MasterResume.id == job.analyzed_with_resume_id
-                ).first()
-                return jsonify({
-                    "error":                     "resume_mismatch",
-                    "analyzed_with_resume_name": analyzed_with.name if analyzed_with else "Unknown",
-                    "analyzed_with_domain":      analyzed_with.domain if analyzed_with else None,
-                    "active_resume_name":        master.name,
-                    "active_domain":             master.domain,
-                }), 409
 
             engine = ScoringEngine()
             score_result = engine.score(job, master)
@@ -551,7 +440,6 @@ def api_generate_resume():
             if existing:
                 existing.tailored_content = tailored_content
                 existing.match_score      = score_result.total_score
-                existing.score_breakdown  = score_result.score_breakdown
                 existing.generated_at     = datetime.now(timezone.utc)
                 resume_id = existing.id
             else:
@@ -560,7 +448,6 @@ def api_generate_resume():
                     master_resume_id=master.id,
                     tailored_content=tailored_content,
                     match_score=score_result.total_score,
-                    score_breakdown=score_result.score_breakdown,
                     generated_at=datetime.now(timezone.utc),
                 )
                 db.add(new_r)
@@ -568,14 +455,7 @@ def api_generate_resume():
                 resume_id = new_r.id
             db.commit()
 
-        api_calls = tailored.api_calls_used if not isinstance(tailored, dict) else 0
-        return jsonify({
-            "ok": True,
-            "resume_id": resume_id,
-            "match_score": score_result.total_score,
-            "api_calls_used": api_calls,
-            "tailoring_applied": api_calls > 0,
-        })
+        return jsonify({"ok": True, "resume_id": resume_id, "match_score": score_result.total_score})
 
     except Exception as exc:
         logger.exception("Resume generation failed for job %s", job_id)
@@ -652,7 +532,7 @@ def api_download_pdf(resume_id):
 # ---------------------------------------------------------------------------
 # API – Stats (dashboard)
 # ---------------------------------------------------------------------------
-
+1
 @app.route("/api/stats")
 def api_stats():
     with get_db() as db:
@@ -678,8 +558,9 @@ def api_stats():
             .all()
         )
 
-    # NVIDIA quota stats (read from persisted usage file, no API call needed)
-    nvidia_stats = {"model": "nvidia/llama-3.3-nemotron-super-49b-v1", "used": 0, "limit": 5000}
+    # Gemini quota stats (read from persisted usage file, no API call needed)
+    gemini_primary = {"model": "gemini-2.5-flash", "used": 0, "limit": 250}
+    gemini_bulk    = {"model": "gemini-2.5-flash-lite", "used": 0, "limit": 1000}
     try:
         import json as _json
         from pathlib import Path as _Path
@@ -687,8 +568,10 @@ def api_stats():
         _usage_file = _Path("data") / "gemini_usage.json"
         if _usage_file.exists():
             _raw = _json.loads(_usage_file.read_text(encoding="utf-8"))
-            if isinstance(_raw.get("nvidia"), dict):
-                nvidia_stats["used"] = _raw["nvidia"].get("calls", 0)
+            if isinstance(_raw.get("primary"), dict):
+                gemini_primary["used"] = _raw["primary"].get("calls", 0)
+            if isinstance(_raw.get("bulk"), dict):
+                gemini_bulk["used"] = _raw["bulk"].get("calls", 0)
     except Exception:
         pass  # Non-critical — dashboard still renders without quota stats
 
@@ -701,7 +584,8 @@ def api_stats():
         "total_apps":    total_apps,
         "avg_score":     avg_score,
         "by_source":     by_source,
-        "nvidia":        nvidia_stats,
+        "gemini_primary": gemini_primary,
+        "gemini_bulk":    gemini_bulk,
     })
 
 
@@ -920,7 +804,6 @@ def _resume_summary(master) -> dict:
         "created_at":   master.created_at.isoformat() if master.created_at else None,
         "domain":       master.domain,
         "domain_display": DOMAINS.get(master.domain, "") if master.domain else "",
-        "domains":      master.domains or ([master.domain] if master.domain else []),
     }
 
 
@@ -1073,26 +956,17 @@ def api_resume_upload():
     f = request.files["file"]
     if not f.filename:
         return jsonify({"error": "Empty filename"}), 400
+    if not f.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files are supported"}), 400
 
-    _ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
-    import os as _os
-    file_ext = _os.path.splitext(f.filename.lower())[1]
-    if file_ext not in _ALLOWED_EXTENSIONS:
-        return jsonify({
-            "error": (
-                f"Unsupported file type '{file_ext}'. "
-                "Upload a PDF (.pdf), Word document (.docx), or plain text (.txt) file."
-            )
-        }), 400
-
-    file_bytes = f.read()
-    if not file_bytes:
+    pdf_bytes = f.read()
+    if not pdf_bytes:
         return jsonify({"error": "Uploaded file is empty"}), 400
 
     try:
         from pdf_generator.pdf_parser import NotAResumeError, ResumePDFParser
         parser = ResumePDFParser()
-        content = parser.parse(file_bytes, file_extension=file_ext.lstrip("."))
+        content = parser.parse(pdf_bytes)
     except NotAResumeError as exc:
         return jsonify({
             "error":         "not_a_resume",
@@ -1137,11 +1011,9 @@ def api_resume_upload():
         from analyzer.domain_detector import DomainDetector
         detected = DomainDetector().detect_from_resume(content)
         detected_domain = detected.get("domain", "other")
-        detected_domains = detected.get("domains")  # list from NIM, or None
         domain_confidence = detected.get("confidence", 0.0)
         logger.info(
-            "Domain detected: %s domains=%s (confidence=%.2f)",
-            detected_domain, detected_domains, domain_confidence,
+            "Domain detected: %s (confidence=%.2f)", detected_domain, domain_confidence
         )
     except Exception as _de:
         logger.warning("Domain detection failed (%s) — storing None.", _de)
@@ -1158,7 +1030,6 @@ def api_resume_upload():
             is_sample=False,
             style_fingerprint=style,
             domain=detected_domain,
-            domains=detected_domains or ([detected_domain] if detected_domain else None),
         )
         db.add(new_resume)
         db.commit()
@@ -1169,19 +1040,6 @@ def api_resume_upload():
     logger.info("PDF resume uploaded: id=%d name=%r domain=%r", resume_id, name, detected_domain)
 
     skills = content.get("skills", [])
-    experience = content.get("work_experience", [])
-    upload_warnings: List[str] = []
-
-    if detected_domain == "other":
-        upload_warnings.append(
-            "Could not auto-detect resume domain. Please set it manually from the Resumes page."
-        )
-    if not skills and not experience:
-        upload_warnings.append(
-            "Resume parsed with no skills or experience detected. "
-            "You may want to re-upload or edit manually."
-        )
-
     style_summary = {}
     if style:
         style_summary = {
@@ -1190,20 +1048,16 @@ def api_resume_upload():
             "metrics":     style.get("metric_usage", {}).get("density", "light"),
             "bullet_char": style.get("format", {}).get("bullet_char", "none"),
         }
-    response: Dict[str, Any] = {
+    return jsonify({
         "ok":              True,
         "id":              resume_id,
         "name":            name,
         "skills_count":    len(skills) if isinstance(skills, list) else 0,
         "style":           style_summary,
         "domain":          detected_domain,
-        "domains":         detected_domains or ([detected_domain] if detected_domain else []),
         "domain_display":  DOMAINS.get(detected_domain, "") if detected_domain else "",
         "domain_confidence": round(domain_confidence, 4),
-    }
-    if upload_warnings:
-        response["warnings"] = upload_warnings
-    return jsonify(response)
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1245,14 +1099,10 @@ def api_active_context():
             "skills_count": len(skills),
         }
         if mr.domain:
-            active_domains = (
-                [d for d in (mr.domains or []) if d in DOMAINS and d != "other"]
-                or ([mr.domain] if mr.domain and mr.domain != "other" else [])
-            )
-            industry_cfgs = settings_manager.get_industry_search_configs_for_domains(active_domains)
+            industry_cfgs = settings_manager.get_industry_search_configs(mr.domain)
             user_cfgs = [
                 c for c in settings_manager.get_search_configs(enabled_only=True)
-                if c.get("domain") in active_domains
+                if c.get("domain") == mr.domain
             ]
 
     mode = settings_manager.get_resume_mode()
@@ -1312,117 +1162,29 @@ def api_sample_resume_preview(domain: str):
 
 
 # ---------------------------------------------------------------------------
-# Delete master resume route
-# ---------------------------------------------------------------------------
-
-
-@app.route("/api/resumes/master/<int:resume_id>", methods=["DELETE"])
-def api_delete_master_resume(resume_id: int):
-    """Delete an uploaded master resume and all its tailored resumes.
-
-    Sample resumes cannot be deleted.  The currently active resume cannot be
-    deleted — switch to another resume first.
-    """
-    with get_db() as db:
-        resume = db.query(MasterResume).filter(MasterResume.id == resume_id).first()
-        if not resume:
-            return jsonify({"error": "Resume not found"}), 404
-        if resume.is_sample:
-            return jsonify({"error": "Sample resumes cannot be deleted"}), 403
-        if resume.is_active:
-            return jsonify({
-                "error": "Cannot delete the active resume. Switch to another resume first."
-            }), 409
-
-        # Collect PDF paths before cascade-deleting so we can clean up disk files
-        pdf_paths = [
-            tr.pdf_path
-            for tr in resume.tailored_resumes
-            if tr.pdf_path
-        ]
-
-        db.delete(resume)
-        db.commit()
-
-    # Best-effort disk cleanup — don't fail if files are already gone
-    for path in pdf_paths:
-        try:
-            import os as _os
-            if _os.path.isfile(path):
-                _os.remove(path)
-        except Exception as _e:
-            logger.warning("Could not delete PDF %s: %s", path, _e)
-
-    logger.info("Master resume #%d deleted (%d PDF(s) removed)", resume_id, len(pdf_paths))
-    return jsonify({"ok": True, "deleted_id": resume_id})
-
-
-# ---------------------------------------------------------------------------
 # Domain override route
 # ---------------------------------------------------------------------------
 
 
 @app.route("/api/resume/<int:resume_id>/domain", methods=["PATCH"])
 def api_resume_set_domain(resume_id: int):
-    """Override the domain(s) on a master resume.
-
-    Accepts either a single domain or a list:
-        {"domain": "software_engineering"}
-        {"domains": ["software_engineering", "ai_ml"]}
-    When ``domains`` is provided it takes precedence; ``domain`` is set to
-    the first entry for backwards compatibility.
-    """
+    """Override the detected domain on a master resume."""
     payload = request.get_json(silent=True) or {}
-
-    domains_list = payload.get("domains")
-    if domains_list is not None:
-        # Multi-domain path
-        if not isinstance(domains_list, list) or not domains_list:
-            return jsonify({"error": "domains must be a non-empty list"}), 400
-        invalid = [d for d in domains_list if d not in DOMAINS or d == "other"]
-        if invalid:
-            return jsonify({"error": f"invalid domains: {invalid}", "valid": list(DOMAINS.keys())}), 400
-        primary = domains_list[0]
-    else:
-        # Single-domain path (backwards compat)
-        domain = payload.get("domain", "").strip()
-        if not domain:
-            return jsonify({"error": "domain or domains required"}), 400
-        if domain not in DOMAINS:
-            return jsonify({"error": f"invalid domain {domain!r}", "valid": list(DOMAINS.keys())}), 400
-        primary = domain
-        domains_list = [domain]
+    domain = payload.get("domain", "").strip()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    if domain not in DOMAINS:
+        return jsonify({"error": f"invalid domain {domain!r}", "valid": list(DOMAINS.keys())}), 400
 
     with get_db() as db:
         resume = db.query(MasterResume).filter(MasterResume.id == resume_id).first()
         if not resume:
             return jsonify({"error": "Resume not found"}), 404
-        resume.domain = primary
-        resume.domains = domains_list
+        resume.domain = domain
         db.commit()
 
-    logger.info("Resume #%d domain overridden to %r (domains=%r)", resume_id, primary, domains_list)
-    return jsonify({"status": "updated", "domain": primary, "domains": domains_list, "display_name": DOMAINS[primary]})
-
-
-# ---------------------------------------------------------------------------
-# Preferred location setting
-# ---------------------------------------------------------------------------
-
-
-@app.route("/api/settings/location", methods=["GET"])
-def api_get_preferred_location():
-    """Return the user's preferred scraping location."""
-    return jsonify({"preferred_location": settings_manager.get_preferred_location()})
-
-
-@app.route("/api/settings/location", methods=["PATCH"])
-def api_set_preferred_location():
-    """Update the user's preferred scraping location."""
-    payload = request.get_json(silent=True) or {}
-    location = str(payload.get("preferred_location", "")).strip()
-    settings_manager.set_preferred_location(location)
-    return jsonify({"status": "updated", "preferred_location": location})
+    logger.info("Resume #%d domain overridden to %r", resume_id, domain)
+    return jsonify({"status": "updated", "domain": domain, "display_name": DOMAINS[domain]})
 
 
 # ---------------------------------------------------------------------------
@@ -1529,6 +1291,270 @@ def api_set_domain_resume(domain: str):
 
 
 # ---------------------------------------------------------------------------
+# Interview Prep routes
+# ---------------------------------------------------------------------------
+
+
+@app.route("/api/interview/start", methods=["POST"])
+def api_interview_start():
+    """Start a browse or mock interview session for a job.
+
+    Body: {"session_id": str, "job_id": int, "mode": "browse"|"mock"}
+    """
+    from web.interviewer import interviewer as _iv
+    from database.models import InterviewSession, InterviewQuestion
+
+    payload = request.get_json(silent=True) or {}
+    session_id = payload.get("session_id", "")
+    job_id = payload.get("job_id")
+    mode = payload.get("mode", "browse")
+
+    if not job_id:
+        return jsonify({"error": "job_id required"}), 400
+    if mode not in ("browse", "mock"):
+        return jsonify({"error": "mode must be 'browse' or 'mock'"}), 400
+
+    with get_db() as db:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+
+        job_title = job.job_title
+        company = job.company_name
+
+        try:
+            questions = _iv.generate_questions(job)
+        except ValueError as exc:
+            logger.error("Interview question generation failed: %s", exc)
+            return jsonify({"error": str(exc)}), 500
+
+        session = InterviewSession(
+            session_id=session_id,
+            job_id=job_id,
+            mode=mode,
+            status="in_progress",
+            current_question=0,
+        )
+        db.add(session)
+        db.flush()
+
+        for q in questions:
+            db.add(InterviewQuestion(
+                interview_session_id=session.id,
+                question_number=q.get("question_number", 0),
+                question_type=q.get("question_type", "behavioral"),
+                question_text=q.get("question_text", ""),
+                category=q.get("category"),
+                model_answer_tips=q.get("model_answer_tips"),
+            ))
+        db.commit()
+        session_id_out = session.id
+
+    if mode == "browse":
+        formatted = _iv.format_browse_questions(questions, job_title, company)
+        return jsonify({
+            "interview_session_id": session_id_out,
+            "mode": "browse",
+            "job_title": job_title,
+            "company": company,
+            "questions_formatted": formatted,
+            "questions": questions,
+        })
+    else:
+        intro = _iv.generate_mock_intro(job_title, company)
+        q1 = questions[0]
+        first_q = f"**Question 1/15** {'🧠 Behavioral' if q1.get('question_type') == 'behavioral' else '⚙️ Technical'}\n\n{q1.get('question_text', '')}"
+        return jsonify({
+            "interview_session_id": session_id_out,
+            "mode": "mock",
+            "job_title": job_title,
+            "company": company,
+            "intro": intro,
+            "first_question": first_q,
+            "question_number": 1,
+            "total_questions": len(questions),
+        })
+
+
+@app.route("/api/interview/<int:interview_id>/answer", methods=["POST"])
+def api_interview_answer(interview_id: int):
+    """Submit an answer to the current question in a mock interview.
+
+    Body: {"answer": str, "session_id": str}
+    """
+    from web.interviewer import interviewer as _iv
+    from database.models import InterviewSession, InterviewQuestion
+
+    payload = request.get_json(silent=True) or {}
+    answer = (payload.get("answer") or "").strip()
+    if not answer:
+        return jsonify({"error": "answer required"}), 400
+
+    with get_db() as db:
+        session = db.query(InterviewSession).filter(
+            InterviewSession.id == interview_id
+        ).first()
+        if not session:
+            return jsonify({"error": "Interview session not found"}), 404
+
+        questions = sorted(session.questions, key=lambda q: q.question_number)
+        idx = session.current_question
+        if idx >= len(questions):
+            return jsonify({"error": "All questions already answered"}), 400
+
+        current_q = questions[idx]
+
+        # Fetch job details for grading context
+        job_title = ""
+        company = ""
+        if session.job_id:
+            job = db.query(Job).filter(Job.id == session.job_id).first()
+            if job:
+                job_title = job.job_title
+                company = job.company_name
+
+        feedback = _iv.grade_answer(
+            current_q.to_dict(), answer, job_title, company
+        )
+
+        current_q.user_answer = answer
+        current_q.feedback_strengths = feedback.get("feedback_strengths", "")
+        current_q.feedback_gaps = feedback.get("feedback_gaps", "")
+        current_q.feedback_suggestion = feedback.get("feedback_suggestion", "")
+        score_val = feedback.get("score_awarded", 0)
+        try:
+            current_q.score_awarded = float(score_val)
+        except (TypeError, ValueError):
+            current_q.score_awarded = 0.0
+
+        session.current_question = idx + 1
+        total = len(questions)
+        more_remaining = (idx + 1) < total
+
+        if more_remaining:
+            next_q = questions[idx + 1]
+            formatted_feedback = _iv.format_mock_feedback(
+                current_q.to_dict(), feedback, idx + 1, total, next_q.to_dict()
+            )
+            db.commit()
+            return jsonify({
+                "status": "continue",
+                "feedback": formatted_feedback,
+                "question_number": idx + 2,
+                "total_questions": total,
+            })
+        else:
+            db.commit()
+
+    # All questions answered — compute final results (outside DB context)
+    with get_db() as db:
+        session = db.query(InterviewSession).filter(
+            InterviewSession.id == interview_id
+        ).first()
+        questions_done = sorted(session.questions, key=lambda q: q.question_number)
+        graded = [q.to_dict() for q in questions_done]
+
+        score = _iv.calculate_score(graded)
+        rec = _iv.calculate_recommendation(score)
+        summary = _iv.generate_final_summary(job_title, company, score, rec, graded)
+        results_text = _iv.format_final_results(
+            job_title, company, score, rec, summary, graded
+        )
+
+        session.status = "completed"
+        session.score = score
+        session.hiring_recommendation = rec
+        session.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+    return jsonify({
+        "status": "completed",
+        "score": score,
+        "recommendation": rec,
+        "results": results_text,
+    })
+
+
+@app.route("/api/interview/active/<session_id>", methods=["GET"])
+def api_interview_active(session_id: str):
+    """Return the current in-progress mock interview for a chat session."""
+    from database.models import InterviewSession
+
+    with get_db() as db:
+        session = db.query(InterviewSession).filter(
+            InterviewSession.session_id == session_id,
+            InterviewSession.status == "in_progress",
+            InterviewSession.mode == "mock",
+        ).first()
+
+        if not session:
+            return jsonify({"error": "No active mock interview"}), 404
+
+        questions = sorted(session.questions, key=lambda q: q.question_number)
+        idx = session.current_question
+        if idx >= len(questions):
+            return jsonify({"error": "Interview already fully answered"}), 404
+
+        current_q = questions[idx]
+        total = len(questions)
+        qtype = current_q.question_type
+        type_label = "🧠 Behavioral" if qtype == "behavioral" else "⚙️ Technical"
+        formatted = (
+            f"**Question {idx + 1}/{total}** {type_label}\n\n"
+            f"{current_q.question_text}"
+        )
+
+        return jsonify({
+            "interview_session": session.to_dict(),
+            "current_question": current_q.to_dict(),
+            "formatted_question": formatted,
+        })
+
+
+@app.route("/api/jobs/<int:job_id>/interview-questions", methods=["GET"])
+def api_job_interview_questions(job_id: int):
+    """Return interview questions for a job (cached from DB or freshly generated)."""
+    from web.interviewer import interviewer as _iv
+    from database.models import InterviewSession
+
+    with get_db() as db:
+        # Return cached questions from an existing session if available
+        existing = db.query(InterviewSession).filter(
+            InterviewSession.job_id == job_id,
+        ).first()
+
+        if existing and existing.questions:
+            questions = [q.to_dict() for q in sorted(
+                existing.questions, key=lambda q: q.question_number
+            )]
+            job = db.query(Job).filter(Job.id == job_id).first()
+            return jsonify({
+                "job_id": job_id,
+                "job_title": job.job_title if job else "",
+                "company": job.company_name if job else "",
+                "questions": questions,
+            })
+
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        job_title = job.job_title
+        company = job.company_name
+
+    try:
+        questions = _iv.generate_questions(job)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({
+        "job_id": job_id,
+        "job_title": job_title,
+        "company": company,
+        "questions": questions,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -1556,7 +1582,7 @@ if __name__ == "__main__":
             )
 
     print(
-        f"\n  Gideon: http://127.0.0.1:{_port}/\n"
+        f"\n  Resume Auto-Tailor: http://127.0.0.1:{_port}/\n"
         f"  PID: {os.getpid()}\n",
         flush=True,
     )

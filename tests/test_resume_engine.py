@@ -3,7 +3,7 @@ Tests for the Phase 4 resume_engine package.
 
 Coverage:
     TestRateLimiter       rate_limiter.py   (14 tests – no real API calls)
-    TestGeminiRewriter    gemini_rewriter.py (18 tests – API mocked)
+    TestRewriter          rewriter.py       (18 tests – API mocked)
     TestContentValidator  validator.py       (22 tests – pure logic)
     TestResumeModifier    modifier.py        (16 tests – API mocked)
 
@@ -224,21 +224,21 @@ class TestRateLimiter(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# TestGeminiRewriter
+# TestRewriter
 # ---------------------------------------------------------------------------
 
 
-class TestGeminiRewriter(unittest.TestCase):
-    """Tests for resume_engine.gemini_rewriter.GeminiRewriter (API mocked)."""
+class TestRewriter(unittest.TestCase):
+    """Tests for resume_engine.rewriter.Rewriter (API mocked)."""
 
     def _make_rewriter(self, mock_response: Optional[str] = "Rewrote bullet using Python and Django."):
-        """Build a GeminiRewriter with _call_nvidia mocked."""
-        from resume_engine.gemini_rewriter import GeminiRewriter, _NVIDIA_MODEL_ID
+        """Build a Rewriter with _call_nvidia mocked."""
+        from resume_engine.rewriter import Rewriter, _NVIDIA_MODEL_ID
         from resume_engine.rate_limiter import RateLimiter
 
         import tempfile
         limiter = RateLimiter(rpm=100, rpd=5_000, usage_file=Path(tempfile.mktemp(suffix=".json")))
-        rw = GeminiRewriter.__new__(GeminiRewriter)
+        rw = Rewriter.__new__(Rewriter)
         rw.model_id = _NVIDIA_MODEL_ID
         rw._limiter = limiter
         rw._nvidia_limiter = limiter
@@ -249,12 +249,12 @@ class TestGeminiRewriter(unittest.TestCase):
         return rw
 
     def test_init_raises_without_nvidia_api_key(self) -> None:
-        from resume_engine.gemini_rewriter import GeminiRewriter
+        from resume_engine.rewriter import Rewriter
 
         with patch.dict(os.environ, {}, clear=True):
             os.environ.pop("NVIDIA_API_KEY", None)
             with self.assertRaises(ValueError):
-                GeminiRewriter(api_key=None)
+                Rewriter(api_key=None)
 
     def test_rewrite_bullet_returns_string(self) -> None:
         rw = self._make_rewriter()
@@ -337,12 +337,12 @@ class TestGeminiRewriter(unittest.TestCase):
 
     def test_api_call_count_increments(self) -> None:
         from resume_engine.rate_limiter import RateLimiter
-        from resume_engine.gemini_rewriter import GeminiRewriter, _NVIDIA_MODEL_ID
+        from resume_engine.rewriter import Rewriter, _NVIDIA_MODEL_ID
 
         import tempfile
         limiter = RateLimiter(rpm=100, rpd=5_000, usage_file=Path(tempfile.mktemp(suffix=".json")))
 
-        rw = GeminiRewriter.__new__(GeminiRewriter)
+        rw = Rewriter.__new__(Rewriter)
         rw.model_id = _NVIDIA_MODEL_ID
         rw._limiter = limiter
         rw._nvidia_limiter = limiter
@@ -366,12 +366,12 @@ class TestGeminiRewriter(unittest.TestCase):
         self.assertIn("instance_calls", stats)
 
     def test_clean_response_strips_asterisks(self) -> None:
-        from resume_engine.gemini_rewriter import _clean_response
+        from resume_engine.rewriter import _clean_response
 
         self.assertEqual(_clean_response("**Bold text**"), "Bold text")
 
     def test_clean_response_strips_quotes(self) -> None:
-        from resume_engine.gemini_rewriter import _clean_response
+        from resume_engine.rewriter import _clean_response
 
         self.assertEqual(_clean_response('"Quoted text"'), "Quoted text")
 
@@ -562,14 +562,14 @@ class TestResumeModifier(unittest.TestCase):
     """Tests for resume_engine.modifier.ResumeModifier (API mocked)."""
 
     def _make_modifier(self) -> "ResumeModifier":
-        from resume_engine.gemini_rewriter import GeminiRewriter, _NVIDIA_MODEL_ID
+        from resume_engine.rewriter import Rewriter, _NVIDIA_MODEL_ID
         from resume_engine.modifier import ResumeModifier
         from resume_engine.rate_limiter import RateLimiter
 
         import tempfile
         limiter = RateLimiter(rpm=100, rpd=5_000, usage_file=Path(tempfile.mktemp(suffix=".json")))
 
-        rw = GeminiRewriter.__new__(GeminiRewriter)
+        rw = Rewriter.__new__(Rewriter)
         rw.model_id = _NVIDIA_MODEL_ID
         rw._limiter = limiter
         rw._nvidia_limiter = limiter

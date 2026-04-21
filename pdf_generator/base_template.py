@@ -34,10 +34,78 @@ class BasePDFTemplate(ABC):
         content_width: Usable width between left and right margins.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, style_fingerprint: Optional[Dict] = None) -> None:
         self.page_width, self.page_height = letter   # 612 x 792 pts
         self.margin: float = MARGIN
         self.content_width: float = self.page_width - 2 * self.margin
+        self.style_fingerprint: Dict = style_fingerprint or {}
+        self._style: Dict = self._resolve_style(self.style_fingerprint)
+
+    # ------------------------------------------------------------------
+    # Fingerprint → rendering style resolver
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_style(fingerprint: Dict) -> Dict:
+        """Map a style fingerprint into a concrete set of rendering hints.
+
+        Returns a dict with:
+            font_family, body_font, bold_font, italic_font, bold_italic_font,
+            bullet_char, section_header_case, section_header_rule
+        All keys always present — safe defaults fill in missing fields.
+        """
+        fp = fingerprint or {}
+
+        font_family = fp.get("font_family") or "Helvetica"
+        if font_family not in ("Times", "Helvetica", "Courier"):
+            font_family = "Helvetica"
+
+        font_map = {
+            "Times": {
+                "body_font":        "Times-Roman",
+                "bold_font":        "Times-Bold",
+                "italic_font":      "Times-Italic",
+                "bold_italic_font": "Times-BoldItalic",
+            },
+            "Helvetica": {
+                "body_font":        "Helvetica",
+                "bold_font":        "Helvetica-Bold",
+                "italic_font":      "Helvetica-Oblique",
+                "bold_italic_font": "Helvetica-BoldOblique",
+            },
+            "Courier": {
+                "body_font":        "Courier",
+                "bold_font":        "Courier-Bold",
+                "italic_font":      "Courier-Oblique",
+                "bold_italic_font": "Courier-BoldOblique",
+            },
+        }
+
+        fmt = fp.get("format") or {}
+        raw_bullet = fmt.get("bullet_char", "\u2022")
+        if raw_bullet in (None, "", "none"):
+            bullet_char = "\u2022"
+        else:
+            bullet_char = raw_bullet
+
+        shs = fp.get("section_header_style") or {}
+        case = shs.get("case", "title_colon")
+        if case not in ("upper", "title_colon", "title"):
+            case = "title_colon"
+        rule = shs.get("rule", True)
+
+        name_alignment = fp.get("name_alignment", "left")
+        if name_alignment not in ("center", "left"):
+            name_alignment = "left"
+
+        return {
+            "font_family": font_family,
+            **font_map[font_family],
+            "bullet_char": bullet_char,
+            "section_header_case": case,
+            "section_header_rule": bool(rule),
+            "name_alignment": name_alignment,
+        }
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -152,10 +220,11 @@ class BasePDFTemplate(ABC):
         c.setFillColor(tc)
         c.drawString(self.margin, y, title)
 
-        rule_y = y - 3
-        c.setStrokeColor(rc)
-        c.setLineWidth(0.75)
-        c.line(self.margin, rule_y, self.page_width - self.margin, rule_y)
+        if self._style.get("section_header_rule", True):
+            rule_y = y - 3
+            c.setStrokeColor(rc)
+            c.setLineWidth(0.75)
+            c.line(self.margin, rule_y, self.page_width - self.margin, rule_y)
 
         return y - font_size - 8   # space below rule
 

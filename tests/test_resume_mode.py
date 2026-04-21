@@ -424,7 +424,8 @@ class TestResumeModeAPI(unittest.TestCase):
         import web.app as app_module
         fake_content = {
             "personal_info": {"name": "Jane", "email": "", "phone": "", "location": ""},
-            "skills": [], "work_experience": [], "education": [], "projects": [],
+            "skills": ["Python"], "work_experience": [{"title": "Dev", "company": "Co", "bullets": []}],
+            "education": [], "projects": [],
             "professional_summary": "",
         }
         with patch("pdf_generator.pdf_parser.ResumePDFParser.parse", return_value=fake_content):
@@ -440,7 +441,8 @@ class TestResumeModeAPI(unittest.TestCase):
             _seed_sample(db)  # is_active = True by default
         fake_content = {
             "personal_info": {"name": "New", "email": "", "phone": "", "location": ""},
-            "skills": [], "work_experience": [], "education": [], "projects": [],
+            "skills": ["Python"], "work_experience": [{"title": "Dev", "company": "Co", "bullets": []}],
+            "education": [], "projects": [],
             "professional_summary": "",
         }
         with patch("pdf_generator.pdf_parser.ResumePDFParser.parse", return_value=fake_content):

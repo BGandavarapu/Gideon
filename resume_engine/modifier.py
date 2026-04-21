@@ -1,7 +1,7 @@
 """
 Resume modification orchestrator for Phase 4.
 
-:class:`ResumeModifier` ties together the Gemini rewriter, content
+:class:`ResumeModifier` ties together the NIM rewriter, content
 validator, and keyword analyser to produce a fully tailored resume from a
 master resume + job description pair.
 
@@ -28,13 +28,13 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from database.models import Job, MasterResume
-from resume_engine.gemini_rewriter import GeminiRewriter
+from resume_engine.rewriter import Rewriter
 from resume_engine.validator import ContentValidator
 
 logger = logging.getLogger(__name__)
 
 # Maximum bullets to rewrite per work-experience position
-_MAX_BULLETS_PER_POSITION = 5
+_MAX_BULLETS_PER_POSITION = 10
 
 # Maximum projects to include in the tailored resume
 _MAX_PROJECTS = 3
@@ -95,7 +95,7 @@ class ModificationResult:
         metrics: Keyword coverage statistics (before / after / improvement).
         modification_log: List of all changes with validation status.
         validation_report: Output of the full-resume validator.
-        api_calls_used: Number of Gemini API calls consumed.
+        api_calls_used: Number of NIM API calls consumed.
     """
 
     content: dict
@@ -124,7 +124,7 @@ class ResumeModifier:
     """Orchestrate AI-powered resume tailoring for a specific job.
 
     Args:
-        rewriter: Optional pre-built :class:`~resume_engine.gemini_rewriter.GeminiRewriter`.
+        rewriter: Optional pre-built :class:`~resume_engine.rewriter.Rewriter`.
             If omitted, a new instance is created (requires ``NVIDIA_API_KEY``).
         on_progress: Optional callback ``fn(step: str, current: int, total: int)``
             invoked as each section is processed.
@@ -136,10 +136,10 @@ class ResumeModifier:
 
     def __init__(
         self,
-        rewriter: Optional[GeminiRewriter] = None,
+        rewriter: Optional[Rewriter] = None,
         on_progress: Optional[Callable[[str, int, int], None]] = None,
     ) -> None:
-        self._rewriter: GeminiRewriter = rewriter or GeminiRewriter()
+        self._rewriter: Rewriter = rewriter or Rewriter()
         self._validator: ContentValidator = ContentValidator()
         self._on_progress = on_progress
         self.modification_log: List[ModificationEntry] = []
@@ -165,7 +165,7 @@ class ResumeModifier:
                 modifier works from raw keyword lists only.
             style_fingerprint: Optional style fingerprint dict from
                 :class:`~resume_engine.style_extractor.StyleExtractor`.
-                When provided it is passed to every Gemini rewriting call
+                When provided it is passed to every NIM rewriting call
                 so the tailored resume preserves the original voice, length,
                 metric density, and formatting conventions.
 
@@ -250,6 +250,15 @@ class ResumeModifier:
             "projects": tailored_projects,
         }
 
+        # Preserve style-rendering hints so the PDF generator can honour
+        # the original font + section header style.
+        if "font_family" in resume_data:
+            raw_tailored_content["font_family"] = resume_data["font_family"]
+        if "section_header_style" in resume_data:
+            raw_tailored_content["section_header_style"] = resume_data["section_header_style"]
+        if "name_alignment" in resume_data:
+            raw_tailored_content["name_alignment"] = resume_data["name_alignment"]
+
         # Enforce original section order from style fingerprint
         section_order = (effective_style or {}).get("structure", [])
         tailored_content = (
@@ -320,6 +329,7 @@ class ResumeModifier:
             job_title=job.job_title,
             keywords=job_keywords,
             years_experience=years_exp,
+            job_description=job.job_description or "",
             style_fingerprint=style_fingerprint,
         )
 
@@ -385,6 +395,7 @@ class ResumeModifier:
                 bullets=bullets,
                 job_keywords=job_keywords,
                 job_context=job_context,
+                job_description=job.job_description or "",
                 max_rewrites=_MAX_BULLETS_PER_POSITION,
                 style_fingerprint=style_fingerprint,
             )
@@ -427,21 +438,47 @@ class ResumeModifier:
 
     def reorder_skills(
         self,
-        skills: List[str],
+        skills,
         job_keywords: List[str],
-    ) -> List[str]:
+    ):
         """Reorder *skills* so job-relevant ones appear first.
+
+        Accepts either a flat list of skill strings OR a categorised dict
+        ``{category_name: [skill, ...]}``. Dict inputs are reordered
+        *within* each category, preserving the category structure so the
+        PDF generator can render them in the original layout.
 
         No API call is made — this is a deterministic sort.
 
         Args:
-            skills: Skills list from the master resume.
+            skills: Skills from the master resume. List or dict.
             job_keywords: Job description keywords.
 
         Returns:
-            Reordered list (no additions or removals).
+            Reordered list or dict, same shape as input.
         """
+        if isinstance(skills, dict):
+            return self._reorder_categorised_skills(skills, job_keywords)
         return self._rewriter.suggest_skills_reorder(skills, job_keywords)
+
+    @staticmethod
+    def _reorder_categorised_skills(
+        skills: Dict[str, List[str]],
+        job_keywords: List[str],
+    ) -> Dict[str, List[str]]:
+        """Sort each category's items so job-matching skills come first."""
+        kw_lower = {kw.lower() for kw in job_keywords}
+
+        def _rank(item: str) -> int:
+            return 0 if item.lower() in kw_lower else 1
+
+        reordered: Dict[str, List[str]] = {}
+        for category, items in skills.items():
+            if not isinstance(items, list):
+                reordered[category] = items
+                continue
+            reordered[category] = sorted(items, key=_rank)
+        return reordered
 
     def select_relevant_projects(
         self,
@@ -526,38 +563,52 @@ class ResumeModifier:
 
     @staticmethod
     def _promote_keywords_to_skills(
-        base_skills: List[str],
+        base_skills,
         job_keywords: List[str],
         tailored_summary: str,
         tailored_experience: List[dict],
-    ) -> List[str]:
-        """Add job keywords to the skills list when they appear in the tailored content.
+    ):
+        """Add job keywords to the skills collection when they appear in tailored content.
 
-        After Gemini rewrites bullets and the summary, some preferred-skill
-        keywords may have been woven into the text.  This method promotes those
-        keywords into the structured skills list so the scoring engine can count
-        them as matched skills, producing a measurable score improvement.
+        After NIM rewrites bullets and the summary, some preferred-skill
+        keywords may have been woven into the text. This method promotes those
+        keywords so the scoring engine can count them.
 
         Only keywords that actually appear (case-insensitively) in the rewritten
         content are added, preserving the no-fabrication guarantee.
 
+        Shape-preserving:
+          - If *base_skills* is a list, returns a list with promoted keywords appended.
+          - If *base_skills* is a dict (categorised), returns a dict with promoted
+            keywords appended to an existing "Frameworks and Libraries" / "Tools" /
+            "Additional Skills" category (created if none exists).
+
         Args:
-            base_skills: Existing skills list from the master resume.
+            base_skills: Existing skills from the master resume (list or dict).
             job_keywords: All required + preferred keywords for the job.
             tailored_summary: Rewritten professional summary text.
             tailored_experience: List of tailored work-experience dicts.
 
         Returns:
-            Extended skills list with promoted keywords appended (deduped).
+            Extended skills collection with promoted keywords appended (deduped).
         """
-        existing_lower = {s.lower() for s in base_skills}
-
         # Build full text corpus from rewritten content
         corpus_parts = [tailored_summary]
         for pos in tailored_experience:
             for bullet in pos.get("bullets", []):
                 corpus_parts.append(bullet)
         corpus = " ".join(corpus_parts).lower()
+
+        # Collect existing skills (flattened for dedup lookup)
+        if isinstance(base_skills, dict):
+            existing_lower = set()
+            for items in base_skills.values():
+                if isinstance(items, list):
+                    existing_lower.update(s.lower() for s in items if isinstance(s, str))
+        elif isinstance(base_skills, list):
+            existing_lower = {s.lower() for s in base_skills if isinstance(s, str)}
+        else:
+            existing_lower = set()
 
         promoted: List[str] = []
         for kw in job_keywords:
@@ -573,7 +624,27 @@ class ResumeModifier:
                 len(promoted), ", ".join(promoted),
             )
 
-        return list(base_skills) + promoted
+        if isinstance(base_skills, dict):
+            # Deep-copy the dict so we don't mutate the master resume
+            result_dict: Dict[str, List[str]] = {
+                k: list(v) if isinstance(v, list) else v
+                for k, v in base_skills.items()
+            }
+            if promoted:
+                # Pick an existing category that best fits, else create one
+                target_category = None
+                for preferred in ("Frameworks and Libraries", "Frameworks", "Tools",
+                                  "Technologies", "Libraries"):
+                    if preferred in result_dict and isinstance(result_dict[preferred], list):
+                        target_category = preferred
+                        break
+                if target_category is None:
+                    target_category = "Additional Skills"
+                    result_dict.setdefault(target_category, [])
+                result_dict[target_category] = list(result_dict[target_category]) + promoted
+            return result_dict
+
+        return list(base_skills or []) + promoted
 
     @staticmethod
     def _infer_years_experience(resume_data: dict) -> int:

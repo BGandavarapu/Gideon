@@ -46,7 +46,7 @@ print(f"  Total jobs updated:      {total_updated}")
 print(f"\nLog counts:")
 print(f"  Total ERROR lines:       {len(errors)}")
 print(f"  Total WARNING lines:     {len(warnings)}")
-print(f"  Gemini 429 quota errors: {len(quota_errors)}")
+print(f"  NIM 429 quota errors:    {len(quota_errors)}")
 
 if quota_errors:
     print(f"\n  First quota error (truncated):")

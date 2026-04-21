@@ -3,7 +3,7 @@ Unit tests for Phase 6: Scheduler, Tasks, and Notifications.
 
 All tests that touch the database use temporary SQLite files so they do not
 pollute the real jobs.db.  All tests that would make network calls (scraping,
-Gemini API) are patched with MagicMock.
+NIM API) are patched with MagicMock.
 
 Test classes
 ------------
@@ -12,7 +12,7 @@ TestNotificationService – Email + console notification logic
 TestSchedulerManager    – SchedulerManager lifecycle and job registration
 TestScrapeJobsTask      – scrape_jobs_task with mocked scraper
 TestAnalyzeNewJobsTask  – analyze_new_jobs_task with in-memory DB
-TestGenerateResumesTask – generate_resumes_task with mocked Gemini
+TestGenerateResumesTask – generate_resumes_task with mocked NIM
 TestCleanupTask         – cleanup_old_jobs_task date-based archiving
 TestDailyReportTask     – daily_report_task summary generation
 """

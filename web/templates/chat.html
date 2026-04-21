@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat — Gideon</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .chat-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+    .chat-content a:hover { opacity: 0.8; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+</head>
+<body class="chat-page">
+
+  <nav class="topnav">
+    <div class="topnav-brand">
+      <div class="logo-mark">G</div>
+      <span class="logo-text">Gideon</span>
+    </div>
+    <ul class="topnav-links">
+      <li><a href="/" class="topnav-link active">Chat</a></li>
+      <li><a href="/dashboard" class="topnav-link">Dashboard</a></li>
+      <li><a href="/jobs" class="topnav-link">Jobs</a></li>
+      <li><a href="/resumes" class="topnav-link">Resumes</a></li>
+      <li><a href="/applications" class="topnav-link">Applications</a></li>
+      <li><a href="/settings" class="topnav-link">Settings</a></li>
+    </ul>
+  </nav>
+
+  <div class="chat-layout">
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <div class="chat-sidebar-header">
+        <button class="chat-new-btn" id="new-chat-btn">+ New Chat</button>
+      </div>
+      <div class="chat-session-list" id="session-list"></div>
+    </aside>
+
+    <main class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="chat-hello-text">Gideon</div>
+          <p class="chat-welcome-sub">Your Personal Employer</p>
+          <div class="chat-welcome-grid" id="prompt-chips">
+            <button class="chat-suggestion-card" data-msg="Scrape jobs for me">
+              <span class="suggestion-icon">&#128269;</span>
+              <span class="suggestion-text">Scrape jobs for me</span>
+            </button>
+            <button class="chat-suggestion-card" data-msg="What skills am I missing?">
+              <span class="suggestion-icon">&#128202;</span>
+              <span class="suggestion-text">What skills am I missing?</span>
+            </button>
+            <button class="chat-suggestion-card" data-msg="Show my job matches">
+              <span class="suggestion-icon">&#127919;</span>
+              <span class="suggestion-text">Show my job matches</span>
+            </button>
+            <button class="chat-suggestion-card" data-msg="Help with my resume">
+              <span class="suggestion-icon">&#128221;</span>
+              <span class="suggestion-text">Help with my resume</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <div class="chat-input-wrapper">
+          <textarea id="chat-input" placeholder="Ask anything..." rows="1" autocomplete="off"></textarea>
+          <button id="chat-send" class="chat-send-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+let sessionId = null;
+let chipsVisible = true;
+
+var renderer = new marked.Renderer();
+var _origLink = renderer.link.bind(renderer);
+renderer.link = function(href, title, text) {
+  var html = _origLink(href, title, text);
+  return html.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+};
+marked.setOptions({ breaks: true, gfm: true, renderer: renderer });
+
+const messagesEl = document.getElementById('chat-messages');
+const inputEl = document.getElementById('chat-input');
+const sendBtn = document.getElementById('chat-send');
+const newChatBtn = document.getElementById('new-chat-btn');
+const sessionListEl = document.getElementById('session-list');
+
+const WELCOME_HTML =
+  '<div class="chat-welcome" id="chat-welcome">' +
+  '<div class="chat-hello-text">Gideon</div>' +
+  '<p class="chat-welcome-sub">Your Personal Employer</p>' +
+  '<div class="chat-welcome-grid" id="prompt-chips">' +
+  '<button class="chat-suggestion-card" data-msg="Scrape jobs for me"><span class="suggestion-icon">&#128269;</span><span class="suggestion-text">Scrape jobs for me</span></button>' +
+  '<button class="chat-suggestion-card" data-msg="What skills am I missing?"><span class="suggestion-icon">&#128202;</span><span class="suggestion-text">What skills am I missing?</span></button>' +
+  '<button class="chat-suggestion-card" data-msg="Show my job matches"><span class="suggestion-icon">&#127919;</span><span class="suggestion-text">Show my job matches</span></button>' +
+  '<button class="chat-suggestion-card" data-msg="Help with my resume"><span class="suggestion-icon">&#128221;</span><span class="suggestion-text">Help with my resume</span></button>' +
+  '</div></div>';
+
+function renderMarkdown(text) {
+  const raw = marked.parse(text || '');
+  return DOMPurify.sanitize(raw);
+}
+
+function addBubble(role, html) {
+  const row = document.createElement('div');
+  row.className = 'chat-row ' + role;
+
+  if (role === 'agent' || role === 'agent loading') {
+    const avatar = document.createElement('div');
+    avatar.className = 'chat-avatar';
+    avatar.textContent = 'G';
+    row.appendChild(avatar);
+  }
+
+  const content = document.createElement('div');
+  content.className = 'chat-content';
+  content.innerHTML = html;
+  row.appendChild(content);
+
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return row;
+}
+
+function addActionChips(row, actions) {
+  if (!actions || !actions.length) return;
+  const chips = document.createElement('div');
+  chips.className = 'chat-action-chips';
+  actions.forEach(function(a) {
+    const chip = document.createElement('span');
+    chip.className = 'chat-action-chip';
+    chip.textContent = '\u2713 ' + a;
+    chips.appendChild(chip);
+  });
+  row.querySelector('.chat-content').appendChild(chips);
+}
+
+function showLoading() {
+  const row = addBubble('agent loading', '<span class="dot"></span><span class="dot"></span><span class="dot"></span>');
+  row.id = 'chat-loading';
+}
+
+function hideLoading() {
+  const el = document.getElementById('chat-loading');
+  if (el) el.remove();
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML.replace(/\n/g, '<br>');
+}
+
+function hideChips() {
+  const welcome = document.getElementById('chat-welcome');
+  if (welcome) welcome.remove();
+  chipsVisible = false;
+}
+
+function autoResize() {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+}
+
+// ── Session storage helpers ──
+function saveSessionId() {
+  if (sessionId) sessionStorage.setItem('gideon_session_id', sessionId);
+}
+function clearSessionId() {
+  sessionId = null;
+  sessionStorage.removeItem('gideon_session_id');
+}
+
+// ── Sidebar: date grouping ──
+function dateGroup(isoStr) {
+  if (!isoStr) return 'Older';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  if (d >= today) return 'Today';
+  if (d >= yesterday) return 'Yesterday';
+  if (d >= weekAgo) return 'This week';
+  return 'Older';
+}
+
+// ── Sidebar: render session list ──
+async function loadSessions() {
+  try {
+    const resp = await fetch('/api/chat/sessions');
+    const data = await resp.json();
+    const sessions = data.sessions || [];
+    sessionListEl.innerHTML = '';
+    if (!sessions.length) return;
+
+    let currentGroup = '';
+    sessions.forEach(function(s) {
+      const group = dateGroup(s.updated_at);
+      if (group !== currentGroup) {
+        currentGroup = group;
+        const label = document.createElement('div');
+        label.className = 'chat-session-group-label';
+        label.textContent = group;
+        sessionListEl.appendChild(label);
+      }
+      const item = document.createElement('div');
+      item.className = 'chat-session-item' + (s.id === sessionId ? ' active' : '');
+      item.dataset.sid = s.id;
+      item.innerHTML =
+        '<span class="session-title">' + escapeHtml(s.title) + '</span>' +
+        '<button class="session-delete" title="Delete">&times;</button>';
+      sessionListEl.appendChild(item);
+    });
+  } catch(e) { /* ignore */ }
+}
+
+// ── Sidebar: load a previous session ──
+async function loadSession(sid) {
+  try {
+    const resp = await fetch('/api/chat/sessions/' + encodeURIComponent(sid));
+    if (!resp.ok) return;
+    const data = await resp.json();
+    sessionId = sid;
+    saveSessionId();
+    messagesEl.innerHTML = '';
+    chipsVisible = false;
+
+    (data.messages || []).forEach(function(m) {
+      if (m.role === 'user') {
+        addBubble('user', escapeHtml(m.content));
+      } else if (m.role === 'assistant') {
+        const row = addBubble('agent', renderMarkdown(m.content));
+        addActionChips(row, m.actions_taken);
+      }
+    });
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    highlightSidebar(sid);
+  } catch(e) { /* ignore */ }
+}
+
+function highlightSidebar(sid) {
+  document.querySelectorAll('.chat-session-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.sid === sid);
+  });
+}
+
+// ── New chat ──
+function newChat() {
+  clearSessionId();
+  messagesEl.innerHTML = WELCOME_HTML;
+  chipsVisible = true;
+  highlightSidebar('');
+  inputEl.focus();
+}
+
+// ── Send message ──
+async function sendMessage(msg) {
+  if (!msg) msg = inputEl.value.trim();
+  if (!msg) return;
+  inputEl.value = '';
+  autoResize();
+  sendBtn.disabled = true;
+  hideChips();
+
+  addBubble('user', escapeHtml(msg));
+  showLoading();
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, session_id: sessionId})
+    });
+    hideLoading();
+    const data = await resp.json();
+    sessionId = data.session_id || sessionId;
+    saveSessionId();
+
+    const row = addBubble('agent', renderMarkdown(data.response));
+    addActionChips(row, data.actions_taken);
+    loadSessions();
+  } catch(e) {
+    hideLoading();
+    addBubble('agent', 'Connection error. Please try again.');
+  }
+  sendBtn.disabled = false;
+  inputEl.focus();
+}
+
+// ── Reset current chat ──
+async function resetChat() {
+  if (sessionId) {
+    try {
+      await fetch('/api/chat/reset', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: sessionId})
+      });
+    } catch(e) { /* ignore */ }
+  }
+  newChat();
+  loadSessions();
+}
+
+// ── Delete a session ──
+async function deleteSession(sid) {
+  try {
+    await fetch('/api/chat/sessions/' + encodeURIComponent(sid), {method: 'DELETE'});
+  } catch(e) { /* ignore */ }
+  if (sid === sessionId) newChat();
+  loadSessions();
+}
+
+// ── Event listeners ──
+sendBtn.addEventListener('click', function() { sendMessage(); });
+newChatBtn.addEventListener('click', newChat);
+
+inputEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+inputEl.addEventListener('input', autoResize);
+
+messagesEl.addEventListener('click', function(e) {
+  const chip = e.target.closest('.chat-suggestion-card');
+  if (chip) sendMessage(chip.dataset.msg);
+});
+
+sessionListEl.addEventListener('click', function(e) {
+  const delBtn = e.target.closest('.session-delete');
+  if (delBtn) {
+    e.stopPropagation();
+    const item = delBtn.closest('.chat-session-item');
+    if (item) deleteSession(item.dataset.sid);
+    return;
+  }
+  const item = e.target.closest('.chat-session-item');
+  if (item) loadSession(item.dataset.sid);
+});
+
+// ── Init: restore session or show greeting ──
+(async function init() {
+  await loadSessions();
+  const savedId = sessionStorage.getItem('gideon_session_id');
+  if (savedId) {
+    await loadSession(savedId);
+  }
+  inputEl.focus();
+
+  var params = new URLSearchParams(window.location.search);
+  var prefill = params.get('prefill');
+  if (prefill) {
+    window.history.replaceState({}, '', '/');
+    sendMessage(prefill);
+  }
+})();
+</script>
+</body>
+</html>
